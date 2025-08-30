@@ -1,0 +1,12 @@
+../Core/Src/st7789.c:18:13:ST7789_Select	8	static
+../Core/Src/st7789.c:22:13:ST7789_Unselect	8	static
+../Core/Src/st7789.c:26:13:ST7789_Reset	8	static
+../Core/Src/st7789.c:33:13:ST7789_WriteCommand	16	static
+../Core/Src/st7789.c:40:13:ST7789_WriteData	16	static
+../Core/Src/st7789.c:48:13:ST7789_SetAddressWindow	32	static
+../Core/Src/st7789.c:72:6:ST7789_Init	16	static
+../Core/Src/st7789.c:95:6:ST7789_DrawPixel	24	static
+../Core/Src/st7789.c:103:6:ST7789_FillRectangle	32	static
+../Core/Src/st7789.c:122:6:ST7789_FillScreen	24	static
+../Core/Src/st7789.c:134:6:ST7789_DrawChar	40	static
+../Core/Src/st7789.c:176:6:ST7789_DrawText	48	static
