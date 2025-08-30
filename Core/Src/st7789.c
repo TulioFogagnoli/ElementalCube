@@ -131,35 +131,26 @@ void ST7789_FillScreen(uint16_t color) {
  * @param foreground Cor do caractere.
  * @param background Cor do fundo.
  */
-void ST7789_DrawChar(uint16_t x, uint16_t y, char ch, uint16_t foreground, uint16_t background) {
-    // Verifica se o caractere caberá na tela
-    if (x + FONT_WIDTH > ST7789_WIDTH || y + FONT_HEIGHT > ST7789_HEIGHT) {
-        return;
+void ST7789_DrawChar(uint16_t x, uint16_t y, char ch, uint16_t foreground, uint16_t background, uint8_t size) {
+    if (x + (FONT_WIDTH * size) > ST7789_WIDTH || y + (FONT_HEIGHT * size) > ST7789_HEIGHT) {
+        return; // Garante que o caractere ampliado ainda caiba na tela
     }
 
-    // Calcula o índice inicial do caractere no array da fonte
-    // A fonte começa no caractere de espaço ' ' (ASCII 32)
     uint32_t font_idx = (ch - ' ') * FONT_HEIGHT;
 
-    // Loop para cada linha de pixels do caractere (altura, eixo Y)
     for (int i = 0; i < FONT_HEIGHT; i++) {
-        
-        // Pega o byte que representa a linha horizontal de pixels
         uint8_t line_data = font[font_idx + i];
-
-        // Loop para cada pixel dentro da linha (largura, eixo X)
         for (int j = 0; j < FONT_WIDTH; j++) {
-            
-            // Verifica se o bit correspondente ao pixel está ligado
             if ((line_data >> j) & 1) {
-                // Se o bit é 1, desenha com a cor da frente (foreground)
-                // AQUI ESTÁ A LÓGICA CRÍTICA:
-                // A coordenada X da tela é modificada pelo loop da largura (j)
-                // A coordenada Y da tela é modificada pelo loop da altura (i)
-                ST7789_DrawPixel(x + i, y + j, foreground);
+                // Em vez de desenhar um pixel, desenha um retângulo do tamanho do scale
+                if (size == 1) {
+                    ST7789_DrawPixel(x + j, y + i, foreground);
+                } else {
+                    ST7789_FillRectangle(x + (i * size), y + (j * size), size, size, foreground);
+                }
             } else {
-                // Se o bit é 0, desenha com a cor de fundo (background)
-                ST7789_DrawPixel(x + i, y + j, background);
+                 // Faz o mesmo para o fundo, para não deixar "buracos"
+                 ST7789_FillRectangle(x + (i * size), y + (j * size), size, size, background);
             }
         }
     }
@@ -173,19 +164,17 @@ void ST7789_DrawChar(uint16_t x, uint16_t y, char ch, uint16_t foreground, uint1
  * @param foreground Cor do texto.
  * @param background Cor do fundo.
  */
-void ST7789_DrawText(uint16_t x, uint16_t y, const char* str, uint16_t foreground, uint16_t background) {
+void ST7789_DrawText(uint16_t x, uint16_t y, const char* str, uint16_t foreground, uint16_t background, uint8_t size) {
     uint16_t current_x = x;
 
     while (*str) {
-        // Verifica se o próximo caractere cabe na tela
-        if (current_x + FONT_WIDTH > ST7789_WIDTH) {
-            // Aqui você poderia implementar quebra de linha, se quisesse.
-            // Por enquanto, apenas paramos de desenhar.
+        // A largura de cada caractere agora é multiplicada pelo tamanho
+        if (current_x + (FONT_WIDTH * size) > ST7789_WIDTH) {
             break; 
         }
 
-        ST7789_DrawChar(current_x, y, *str, foreground, background);
-        current_x += FONT_WIDTH; // Avança para a posição do próximo caractere
-        str++; // Avança para o próximo caractere na string
+        ST7789_DrawChar(current_x, y, *str, foreground, background, size);
+        current_x += (FONT_WIDTH * size); // Avança o cursor pela largura correta
+        str++;
     }
 }

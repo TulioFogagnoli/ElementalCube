@@ -8,5 +8,5 @@
 ../Core/Src/st7789.c:95:6:ST7789_DrawPixel	24	static
 ../Core/Src/st7789.c:103:6:ST7789_FillRectangle	32	static
 ../Core/Src/st7789.c:122:6:ST7789_FillScreen	24	static
-../Core/Src/st7789.c:134:6:ST7789_DrawChar	40	static
-../Core/Src/st7789.c:176:6:ST7789_DrawText	48	static
+../Core/Src/st7789.c:134:6:ST7789_DrawChar	48	static
+../Core/Src/st7789.c:167:6:ST7789_DrawText	48	static

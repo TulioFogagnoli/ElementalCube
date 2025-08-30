@@ -6,6 +6,7 @@
 // Defina aqui as dimensões do seu display
 #define ST7789_WIDTH  240
 #define ST7789_HEIGHT 240
+#define ST7789_SIZE   2
 
 // Definição de cores (formato RGB565)
 #define ST7789_BLACK   0x0000
@@ -22,7 +23,6 @@ void ST7789_Init(void);
 void ST7789_FillScreen(uint16_t color);
 void ST7789_DrawPixel(uint16_t x, uint16_t y, uint16_t color);
 void ST7789_FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
-void ST7789_DrawChar(uint16_t x, uint16_t y, char ch, uint16_t foreground, uint16_t background);
-void ST7789_DrawText(uint16_t x, uint16_t y, const char* str, uint16_t foreground, uint16_t background);
-
+void ST7789_DrawChar(uint16_t x, uint16_t y, char ch, uint16_t foreground, uint16_t background, uint8_t size);
+void ST7789_DrawText(uint16_t x, uint16_t y, const char* str, uint16_t foreground, uint16_t background, uint8_t size);
 #endif // ST7789_H

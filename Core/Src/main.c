@@ -354,7 +354,7 @@ void StartDefaultTask(void const * argument)
   char displayBuffer[20];
 
   // Desenha a mensagem inicial uma vez
-  ST7789_DrawText(10, 10, "Pressione uma tecla:", ST7789_WHITE, ST7789_BLACK);
+  ST7789_DrawText(10, 10, "Pressione uma tecla:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
 
   /* Infinite loop */
   for(;;) // O loop infinito de uma tarefa RTOS é "for(;;)"
@@ -370,7 +370,7 @@ void StartDefaultTask(void const * argument)
       sprintf(displayBuffer, "Tecla: %c", keyPressed);
       
       // Exibe o texto formatado no LCD
-      ST7789_DrawText(10, 30, displayBuffer, ST7789_YELLOW, ST7789_BLACK);
+      ST7789_DrawText(10, 30, displayBuffer, ST7789_YELLOW, ST7789_BLACK, ST7789_SIZE);
       
       printf("Tecla pressionada: %c\n", keyPressed);
     }
