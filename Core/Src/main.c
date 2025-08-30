@@ -24,6 +24,9 @@
 /* USER CODE BEGIN Includes */
 #include "st7789.h"
 #include "keypad.h"
+
+#include "game_fsm.h"
+#include "game_types.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,10 +46,12 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
-
 UART_HandleTypeDef huart4;
 
-osThreadId defaultTaskHandle;
+osThreadId inputHalTaskHandle;
+osThreadId gameTaskHandle;
+
+char keyPressed;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -56,7 +61,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_UART4_Init(void);
 static void MX_SPI1_Init(void);
-void StartDefaultTask(void const * argument);
+void StartInputHalTask(void const * argument);
+void StartGameTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -127,10 +133,12 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
+  osThreadDef(initPutHalTask, StartInputHalTask, osPriorityNormal, 0, 128);
+  inputHalTaskHandle = osThreadCreate(osThread(initPutHalTask), NULL);
+
+  osThreadDef(gameTask, StartGameTask, osPriorityNormal, 0, 128);
+  gameTaskHandle = osThreadCreate(osThread(gameTask), NULL);
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -339,46 +347,77 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
-/**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+void StartInputHalTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-  // Coloque suas variáveis aqui, fora do loop infinito
-  char keyPressed;
-  char displayBuffer[20];
-
-  // Desenha a mensagem inicial uma vez
-  ST7789_DrawText(10, 10, "Pressione uma tecla:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-
+  char cCurrent;
   /* Infinite loop */
   for(;;) // O loop infinito de uma tarefa RTOS é "for(;;)"
   {
-    keyPressed = KEYPAD_Scan(); // Escaneia o teclado
-
-    if (keyPressed != '\0') { // Verifica se uma tecla foi realmente pressionada
-      
-      // Limpa a área da resposta anterior
-      ST7789_FillRectangle(10, 30, 200, 15, ST7789_BLACK);
-
-      // Formata o texto para exibição
-      sprintf(displayBuffer, "Tecla: %c", keyPressed);
-      
-      // Exibe o texto formatado no LCD
-      ST7789_DrawText(10, 30, displayBuffer, ST7789_YELLOW, ST7789_BLACK, ST7789_SIZE);
-      
-      printf("Tecla pressionada: %c\n", keyPressed);
+    cCurrent = KEYPAD_Scan(); // Escaneia o teclado
+    if(cCurrent != '\0')
+    {
+      keyPressed = cCurrent;
     }
-    
-    osDelay(20); // Use osDelay() em vez de HAL_Delay()!
   }
 }
 
+void StartGameTask(void const * argument)
+{
+  EGameStates eCurrentState = eInitGame;
+  ST7789_FillRectangle(0, 0, 240, 240, ST7789_BLACK); // Limpa a tela
+  for(;;)
+  {
+    // Verifica se uma tecla foi realmente pressionada
+    switch(eCurrentState)
+    {
+    case eInitGame:
+      char cDisplayBuffer[20];
+      sprintf(cDisplayBuffer, "ElementalCube!");
+      ST7789_DrawText(10, 10, cDisplayBuffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+      if(keyPressed == '*')
+      {
+        eCurrentState = eDificultSelect;
+      }
+      break;
+    case eDificultSelect:
+
+      if(keyPressed == '*')
+      {
+        eCurrentState = ePersonaSelect;
+      }
+      break;
+    case ePersonaSelect:
+
+      if(keyPressed == '*')
+      {
+        eCurrentState = eBattleInit;
+      }
+      break;
+    case eBattleInit:
+      if(keyPressed == '*')
+      {
+        eCurrentState = ePlayerTurn;
+      }
+      break;
+    case ePlayerTurn:
+      if(keyPressed == '*')
+      {
+        eCurrentState = eEndGame;
+      }
+      break;
+    case eEndGame:
+      if(keyPressed == '*')
+      {
+        eCurrentState = eInitGame;
+      }
+      break;
+    default:
+      break;
+    }
+    
+  }
+}
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
