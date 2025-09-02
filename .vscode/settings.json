@@ -1,5 +1,10 @@
 {
     "files.associations": {
-        "stm32f4xx_hal.h": "c"
+        "stm32f4xx_hal.h": "c",
+        "game_screen.h": "c",
+        "st7789.h": "c",
+        "stdint.h": "c",
+        "test": "c",
+        "cmsis_os.h": "c"
     }
 }

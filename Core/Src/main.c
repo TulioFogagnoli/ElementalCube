@@ -24,9 +24,11 @@
 /* USER CODE BEGIN Includes */
 #include "st7789.h"
 #include "keypad.h"
+#include "font.h"
 
 #include "game_fsm.h"
 #include "game_types.h"
+#include "game_screen.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +38,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,8 +51,17 @@ UART_HandleTypeDef huart4;
 
 osThreadId inputHalTaskHandle;
 osThreadId gameTaskHandle;
+osThreadId displayTaskHandle; 
+osMutexId gameMutexHandle;   
 
-char keyPressed;
+volatile char keyPressed = '\0';
+volatile EGameStates eCurrentState = eInitGame;
+volatile int selectedOption = 0;
+volatile uint8_t u8CleanScreen = TRUE;
+volatile EDificult selectedDifficulty;
+volatile EWizard selectedPersona;
+const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
+const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -63,7 +73,7 @@ static void MX_UART4_Init(void);
 static void MX_SPI1_Init(void);
 void StartInputHalTask(void const * argument);
 void StartGameTask(void const * argument);
-
+void StartDisplayTask(void const * argument);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -133,12 +143,17 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
+  osMutexDef(gameMutex);
+  gameMutexHandle = osMutexCreate(osMutex(gameMutex));
 
   osThreadDef(initPutHalTask, StartInputHalTask, osPriorityNormal, 0, 128);
   inputHalTaskHandle = osThreadCreate(osThread(initPutHalTask), NULL);
 
-  osThreadDef(gameTask, StartGameTask, osPriorityNormal, 0, 128);
+  osThreadDef(gameTask, StartGameTask, osPriorityNormal, 0, 256);
   gameTaskHandle = osThreadCreate(osThread(gameTask), NULL);
+
+  osThreadDef(displayTask, StartDisplayTask, osPriorityNormal, 0, 256);
+  displayTaskHandle = osThreadCreate(osThread(displayTask), NULL);
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -359,64 +374,211 @@ void StartInputHalTask(void const * argument)
     {
       keyPressed = cCurrent;
     }
+    osDelay(50);
   }
 }
 
 void StartGameTask(void const * argument)
 {
-  EGameStates eCurrentState = eInitGame;
-  ST7789_FillRectangle(0, 0, 240, 240, ST7789_BLACK); // Limpa a tela
+  char cLocalKeyPressed;
+
   for(;;)
   {
-    // Verifica se uma tecla foi realmente pressionada
-    switch(eCurrentState)
-    {
-    case eInitGame:
-      char cDisplayBuffer[20];
-      sprintf(cDisplayBuffer, "ElementalCube!");
-      ST7789_DrawText(10, 10, cDisplayBuffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-      if(keyPressed == '*')
-      {
-        eCurrentState = eDificultSelect;
-      }
-      break;
-    case eDificultSelect:
+    cLocalKeyPressed = NONE_KEY;
 
-      if(keyPressed == '*')
-      {
-        eCurrentState = ePersonaSelect;
-      }
-      break;
-    case ePersonaSelect:
-
-      if(keyPressed == '*')
-      {
-        eCurrentState = eBattleInit;
-      }
-      break;
-    case eBattleInit:
-      if(keyPressed == '*')
-      {
-        eCurrentState = ePlayerTurn;
-      }
-      break;
-    case ePlayerTurn:
-      if(keyPressed == '*')
-      {
-        eCurrentState = eEndGame;
-      }
-      break;
-    case eEndGame:
-      if(keyPressed == '*')
-      {
-        eCurrentState = eInitGame;
-      }
-      break;
-    default:
-      break;
+    osMutexWait(gameMutexHandle, osWaitForever);
+    if (keyPressed != NONE_KEY) {
+        cLocalKeyPressed = keyPressed;
+        keyPressed = NONE_KEY; 
     }
-    
+    osMutexRelease(gameMutexHandle);
+
+    if (cLocalKeyPressed != NONE_KEY)
+    {
+      osMutexWait(gameMutexHandle, osWaitForever);
+      switch(eCurrentState)
+      {
+        case eInitGame:
+        {
+          if(cLocalKeyPressed == CONFIRM_KEY)
+          {
+            eCurrentState = eDificultSelect;
+            selectedOption = 0;
+            u8CleanScreen = TRUE;
+            }
+          break;
+        }
+        case eDificultSelect:
+        {
+          switch(cLocalKeyPressed)
+          {
+            case UP_KEY:
+            {
+              selectedOption = (selectedOption < MENU_OPTIONS_DIFFICULTY - 1) ? selectedOption + 1 : 0;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case DOWN_KEY:
+            {
+              selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_DIFFICULTY - 1;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case BACK_KEY:
+            {
+              u8CleanScreen = TRUE;
+              eCurrentState = eInitGame;
+              break;
+            }
+            case CONFIRM_KEY:
+            {
+              selectedDifficulty = (EDificult)selectedOption;
+              eCurrentState = ePersonaSelect;
+              selectedOption = FALSE; // Reseta para o próximo menu
+              u8CleanScreen = TRUE;
+              break;
+            }
+            default:
+            {
+              break;
+            }
+          }
+          break;
+        }
+        case ePersonaSelect:
+        {
+          switch(cLocalKeyPressed)
+          {
+            case UP_KEY:
+            {                  
+              selectedOption = (selectedOption < MENU_OPTIONS_PERSONA - 1) ? selectedOption + 1 : 0;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case DOWN_KEY:
+            {
+              selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_PERSONA - 1;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case BACK_KEY:
+            {
+              u8CleanScreen = TRUE;
+              eCurrentState = eDificultSelect;
+              break;
+            }
+            case CONFIRM_KEY:
+            {
+              selectedPersona.ePersonaElemental = (EElemental)selectedOption;
+              eCurrentState = eBattleInit;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            default:
+            {
+              break;
+            }
+          }
+          break;
+        }
+        case eBattleInit:
+        {
+          if(cLocalKeyPressed == CONFIRM_KEY)
+          {
+            eCurrentState = ePlayerTurn;
+            u8CleanScreen = TRUE;
+          }
+          break;
+        }
+        case ePlayerTurn:
+        {
+          if(cLocalKeyPressed == CONFIRM_KEY)
+          {
+            eCurrentState = eEndGame;
+            u8CleanScreen = TRUE;
+          }
+          break;
+        }
+        case eEndGame:
+        {
+          if(cLocalKeyPressed == CONFIRM_KEY)
+          {
+            eCurrentState = eInitGame;
+            u8CleanScreen = TRUE;
+          }
+          break;
+        }
+        default:
+        {
+          // Estado desconhecido, volta para o início por segurança
+          eCurrentState = eInitGame;
+          u8CleanScreen = TRUE;
+          break;
+        }
+      }
+      osMutexRelease(gameMutexHandle);
+    }
+    osDelay(50);
   }
+}
+
+void StartDisplayTask(void const * argument)
+{
+  /* USER CODE BEGIN StartDisplayTask */
+  char buffer[30];
+  uint8_t u8RedrawScreen = FALSE;
+  for(;;)
+  {
+
+    osMutexWait(gameMutexHandle, osWaitForever);
+    if (TRUE == u8CleanScreen) {
+        u8RedrawScreen = TRUE;
+        u8CleanScreen = FALSE; 
+    }
+    osMutexRelease(gameMutexHandle);
+
+
+    if(TRUE == u8RedrawScreen)
+    {
+        switch(eCurrentState)
+        {
+            case eInitGame:
+                ClearScreen();
+                ST7789_DrawText(10, 10, "ElementalCube!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                ST7789_DrawText(10, 40, "Pressione *", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                break;
+            case eDificultSelect:
+                DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
+                break;
+            case ePersonaSelect:
+                DrawMenu("Selecione Personagem", personaOptions, MENU_OPTIONS_PERSONA, selectedOption);
+                break;
+            case eBattleInit:
+                ClearScreen();
+                ST7789_DrawText(10, 10, "Batalha Iniciando...", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                sprintf(buffer, "Dif: %s", difficultyOptions[selectedDifficulty]);
+                ST7789_DrawText(10, 40, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                sprintf(buffer, "Pers: %s", personaOptions[selectedPersona.ePersonaElemental]);
+                ST7789_DrawText(10, 60, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                break;
+            case ePlayerTurn:
+                 ClearScreen();
+                 ST7789_DrawText(10, 10, "Seu Turno!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                 break;
+            case eEndGame:
+                 ClearScreen();
+                 ST7789_DrawText(10, 10, "Fim de Jogo!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                 break;
+            default:
+                 ClearScreen();
+                 ST7789_DrawText(10, 10, "Erro de Estado!", ST7789_RED, ST7789_BLACK, ST7789_SIZE);
+                 break;
+        }
+        u8RedrawScreen = FALSE;
+    }
+    osDelay(10);
+  }
+  /* USER CODE END StartDisplayTask */
 }
 /**
   * @brief  This function is executed in case of error occurrence.

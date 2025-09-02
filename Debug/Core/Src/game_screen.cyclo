@@ -1,0 +1,2 @@
+../Core/Src/game_screen.c:5:6:ClearScreen	1
+../Core/Src/game_screen.c:9:6:DrawMenu	4

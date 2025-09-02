@@ -81,6 +81,17 @@ void Error_Handler(void);
 #define LCD_CS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define FALSE 0
+#define TRUE 1
+
+#define UP_KEY '8'
+#define DOWN_KEY '2'
+#define CONFIRM_KEY '*'
+#define BACK_KEY '#'
+#define NONE_KEY '\0'
+
+#define MENU_OPTIONS_DIFFICULTY 3
+#define MENU_OPTIONS_PERSONA 5
 
 /* USER CODE END Private defines */
 
