@@ -8,7 +8,6 @@ void ClearScreen() {
 
 void DrawMenu(const char* title, const char** options, int numOptions, int currentSelection) {
     char buffer[30];
-    ClearScreen();
     sprintf(buffer, "%s", title);
     ST7789_DrawText(10, 10, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
 

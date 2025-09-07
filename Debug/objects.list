@@ -1,5 +1,6 @@
 "./Core/Src/font.o"
 "./Core/Src/freertos.o"
+"./Core/Src/game_fsm.o"
 "./Core/Src/game_screen.o"
 "./Core/Src/keypad.o"
 "./Core/Src/main.o"

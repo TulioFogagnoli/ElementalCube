@@ -1,5 +1,7 @@
 #ifndef GAME_TYPES_H
 #define GAME_TYPES_H
+
+#include <stdint.h>
 typedef enum {
     eElementalFire, 
     eElementalWater, 

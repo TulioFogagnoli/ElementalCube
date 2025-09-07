@@ -44,7 +44,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
  ../Core/Inc/st7789.h ../Core/Inc/keypad.h ../Core/Inc/font.h \
- ../Core/Inc/game_fsm.h ../Core/Inc/game_types.h \
+ ../Core/Inc/game_fsm.h ../Core/Inc/game_types.h ../Core/Inc/game_types.h \
  ../Core/Inc/game_screen.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
@@ -95,5 +95,6 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/keypad.h:
 ../Core/Inc/font.h:
 ../Core/Inc/game_fsm.h:
+../Core/Inc/game_types.h:
 ../Core/Inc/game_types.h:
 ../Core/Inc/game_screen.h:

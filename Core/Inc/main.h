@@ -88,6 +88,10 @@ void Error_Handler(void);
 #define DOWN_KEY '2'
 #define CONFIRM_KEY '*'
 #define BACK_KEY '#'
+#define FIRE_KEY 'A'
+#define WATER_KEY 'B'
+#define AIR_KEY 'C'
+#define EARTH_KEY 'D'
 #define NONE_KEY '\0'
 
 #define MENU_OPTIONS_DIFFICULTY 3

@@ -60,6 +60,7 @@ volatile int selectedOption = 0;
 volatile uint8_t u8CleanScreen = TRUE;
 volatile EDificult selectedDifficulty;
 volatile EWizard selectedPersona;
+volatile uint8_t u8ContAttack = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
 /* USER CODE BEGIN PV */
@@ -472,6 +473,9 @@ void StartGameTask(void const * argument)
               selectedPersona.ePersonaElemental = (EElemental)selectedOption;
               eCurrentState = eBattleInit;
               u8CleanScreen = TRUE;
+              u8ContAttack = 0;     // Zera o contador de ataques
+              selectedOption = 0;   // Inicia com a primeira opção (Fogo) pré-selecionada
+
               break;
             }
             default:
@@ -483,10 +487,62 @@ void StartGameTask(void const * argument)
         }
         case eBattleInit:
         {
-          if(cLocalKeyPressed == CONFIRM_KEY)
+          switch (cLocalKeyPressed)
           {
-            eCurrentState = ePlayerTurn;
-            u8CleanScreen = TRUE;
+            case FIRE_KEY:
+            {
+              selectedOption = 0;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case WATER_KEY:
+            {
+              selectedOption = 1;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case AIR_KEY: 
+            {
+              selectedOption = 2;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case EARTH_KEY: 
+            {
+              selectedOption = 3;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case CONFIRM_KEY:
+            {
+              switch(selectedOption)
+              {
+                  case 0: selectedPersona.eAttackSequential[u8ContAttack] = eRed;    break;
+                  case 1: selectedPersona.eAttackSequential[u8ContAttack] = eBlue;   break;
+                  case 2: selectedPersona.eAttackSequential[u8ContAttack] = eGreen;  break;
+                  case 3: selectedPersona.eAttackSequential[u8ContAttack] = eYellow; break;
+              }
+              
+              u8ContAttack++; 
+              
+              if (u8ContAttack >= 4)
+              {
+                eCurrentState = ePlayerTurn;
+              }
+              
+              u8CleanScreen = TRUE;
+              break;
+            }
+            case BACK_KEY:
+            {
+              eCurrentState = ePersonaSelect;
+              u8CleanScreen = TRUE;
+              break;
+            }
+            default:
+            {
+              break;
+            }
           }
           break;
         }
@@ -540,43 +596,82 @@ void StartDisplayTask(void const * argument)
 
     if(TRUE == u8RedrawScreen)
     {
-        switch(eCurrentState)
-        {
-            case eInitGame:
-                ClearScreen();
-                ST7789_DrawText(10, 10, "ElementalCube!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                ST7789_DrawText(10, 40, "Pressione *", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                break;
-            case eDificultSelect:
-                DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
-                break;
-            case ePersonaSelect:
-                DrawMenu("Selecione Personagem", personaOptions, MENU_OPTIONS_PERSONA, selectedOption);
-                break;
-            case eBattleInit:
-                ClearScreen();
-                ST7789_DrawText(10, 10, "Batalha Iniciando...", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                sprintf(buffer, "Dif: %s", difficultyOptions[selectedDifficulty]);
-                ST7789_DrawText(10, 40, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                sprintf(buffer, "Pers: %s", personaOptions[selectedPersona.ePersonaElemental]);
-                ST7789_DrawText(10, 60, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                break;
-            case ePlayerTurn:
-                 ClearScreen();
-                 ST7789_DrawText(10, 10, "Seu Turno!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                 break;
-            case eEndGame:
-                 ClearScreen();
-                 ST7789_DrawText(10, 10, "Fim de Jogo!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-                 break;
-            default:
-                 ClearScreen();
-                 ST7789_DrawText(10, 10, "Erro de Estado!", ST7789_RED, ST7789_BLACK, ST7789_SIZE);
-                 break;
-        }
-        u8RedrawScreen = FALSE;
+      ClearScreen();
+
+      switch(eCurrentState)
+      {
+          case eInitGame:
+          {
+            ST7789_DrawText(10, 10, "ElementalCube!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ST7789_DrawText(10, 40, "Pressione *", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            break;
+          }
+          case eDificultSelect:
+          {
+            DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
+            break;
+          }
+          case ePersonaSelect:
+          {
+            DrawMenu("Selecione Personagem", personaOptions, MENU_OPTIONS_PERSONA, selectedOption);
+            break;
+          }
+          case eBattleInit:
+          {
+            sprintf(buffer, "Selecione o %d ataque", (u8ContAttack + 1));
+            ST7789_DrawText(10, 10, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+
+            uint16_t colorFogo  = (selectedOption == 0) ? ST7789_YELLOW : ST7789_WHITE;
+            uint16_t colorAgua  = (selectedOption == 1) ? ST7789_YELLOW : ST7789_WHITE;
+            uint16_t colorAr    = (selectedOption == 2) ? ST7789_YELLOW : ST7789_WHITE;
+            uint16_t colorTerra = (selectedOption == 3) ? ST7789_YELLOW : ST7789_WHITE;
+
+            ST7789_FillRectangle(10, 40, 20, 20, ST7789_RED);
+            ST7789_DrawText(40, 45, "A - Fogo", colorFogo, ST7789_BLACK, ST7789_SIZE);
+
+            ST7789_FillRectangle(10, 70, 20, 20, ST7789_BLUE);
+            ST7789_DrawText(40, 75, "B - Agua", colorAgua, ST7789_BLACK, ST7789_SIZE);
+
+            ST7789_FillRectangle(10, 100, 20, 20, ST7789_CYAN);
+            ST7789_DrawText(40, 105, "C - Ar", colorAr, ST7789_BLACK, ST7789_SIZE);
+
+            ST7789_FillRectangle(10, 130, 20, 20, ST7789_BROWN);
+            ST7789_DrawText(40, 135, "D - Terra", colorTerra, ST7789_BLACK, ST7789_SIZE);
+
+            for(uint8_t i = 0; i < u8ContAttack; i++)
+            {
+              char* attackName = "";
+              uint16_t attackColor = ST7789_WHITE;
+              switch(selectedPersona.eAttackSequential[i])
+              {
+                  case eRed:    attackColor = ST7789_RED;   break;
+                  case eBlue:   attackColor = ST7789_BLUE;  break;
+                  case eGreen:  attackColor = ST7789_CYAN;  break;
+                  case eYellow: attackColor = ST7789_BROWN; break;
+              }
+              ST7789_FillRectangle(10 + (i * 30), 180, 20, 20, attackColor);
+            }
+            break;
+          }
+          case ePlayerTurn:
+          {
+            ST7789_DrawText(10, 10, "Seu Turno!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            break;
+          }
+          case eEndGame:
+          {
+            ST7789_DrawText(10, 10, "Fim de Jogo!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            break;
+          }
+          default:
+          {
+            ST7789_DrawText(10, 10, "Erro de Estado!", ST7789_RED, ST7789_BLACK, ST7789_SIZE);
+            break;
+          }
+      }
+      u8RedrawScreen = FALSE;
     }
-    osDelay(10);
+    osDelay(5);
   }
   /* USER CODE END StartDisplayTask */
 }

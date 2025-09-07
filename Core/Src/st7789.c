@@ -178,3 +178,259 @@ void ST7789_DrawText(uint16_t x, uint16_t y, const char* str, uint16_t foregroun
         str++;
     }
 }
+
+// Funções auxiliares para trocar valores, usadas nos algoritmos
+static void swap_uint16(uint16_t* a, uint16_t* b) {
+    uint16_t t = *a;
+    *a = *b;
+    *b = t;
+}
+
+/**
+ * @brief Desenha uma linha horizontal otimizada.
+ */
+void ST7789_DrawHorizontalLine(uint16_t x, uint16_t y, uint16_t w, uint16_t color) {
+    // Usa a função de preencher retângulo com altura 1, que é muito mais rápida
+    ST7789_FillRectangle(x, y, w, 1, color);
+}
+
+/**
+ * @brief Desenha uma linha vertical otimizada.
+ */
+void ST7789_DrawVerticalLine(uint16_t x, uint16_t y, uint16_t h, uint16_t color) {
+    // Usa a função de preencher retângulo com largura 1, que é muito mais rápida
+    ST7789_FillRectangle(x, y, 1, h, color);
+}
+
+/**
+ * @brief Desenha uma linha entre dois pontos usando o algoritmo de Bresenham.
+ */
+void ST7789_DrawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color) {
+    int16_t steep = abs(y1 - y0) > abs(x1 - x0);
+    if (steep) {
+        swap_uint16(&x0, &y0);
+        swap_uint16(&x1, &y1);
+    }
+    if (x0 > x1) {
+        swap_uint16(&x0, &x1);
+        swap_uint16(&y0, &y1);
+    }
+
+    int16_t dx = x1 - x0;
+    int16_t dy = abs(y1 - y0);
+    int16_t err = dx / 2;
+    int16_t ystep;
+
+    if (y0 < y1) {
+        ystep = 1;
+    } else {
+        ystep = -1;
+    }
+
+    for (; x0 <= x1; x0++) {
+        if (steep) {
+            ST7789_DrawPixel(y0, x0, color);
+        } else {
+            ST7789_DrawPixel(x0, y0, color);
+        }
+        err -= dy;
+        if (err < 0) {
+            y0 += ystep;
+            err += dx;
+        }
+    }
+}
+
+/**
+ * @brief Desenha o contorno de um retângulo.
+ */
+void ST7789_DrawRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
+    ST7789_DrawHorizontalLine(x, y, w, color);         // Top
+    ST7789_DrawHorizontalLine(x, y + h - 1, w, color); // Bottom
+    ST7789_DrawVerticalLine(x, y, h, color);           // Left
+    ST7789_DrawVerticalLine(x + w - 1, y, h, color);   // Right
+}
+
+/**
+ * @brief Desenha o contorno de um triângulo.
+ */
+void ST7789_DrawTriangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color) {
+    ST7789_DrawLine(x0, y0, x1, y1, color);
+    ST7789_DrawLine(x1, y1, x2, y2, color);
+    ST7789_DrawLine(x2, y2, x0, y0, color);
+}
+
+/**
+ * @brief Preenche um triângulo usando a técnica de scanline.
+ */
+void ST7789_FillTriangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color) {
+    int16_t a, b, y, last;
+    
+    // Ordena os vértices por y (y0 <= y1 <= y2)
+    if (y0 > y1) { swap_uint16(&y0, &y1); swap_uint16(&x0, &x1); }
+    if (y1 > y2) { swap_uint16(&y2, &y1); swap_uint16(&x2, &x1); }
+    if (y0 > y1) { swap_uint16(&y0, &y1); swap_uint16(&x0, &x1); }
+
+    if (y0 == y2) { // Triângulo completamente horizontal
+        a = b = x0;
+        if (x1 < a) a = x1;
+        else if (x1 > b) b = x1;
+        if (x2 < a) a = x2;
+        else if (x2 > b) b = x2;
+        ST7789_DrawHorizontalLine(a, y0, b - a + 1, color);
+        return;
+    }
+
+    int16_t dx01 = x1 - x0, dy01 = y1 - y0,
+            dx02 = x2 - x0, dy02 = y2 - y0,
+            dx12 = x2 - x1, dy12 = y2 - y1;
+    int32_t sa = 0, sb = 0;
+
+    // Parte de cima do triângulo
+    if (y1 == y2) last = y1;
+    else last = y1 - 1;
+
+    for (y = y0; y <= last; y++) {
+        a = x0 + sa / dy01;
+        b = x0 + sb / dy02;
+        sa += dx01;
+        sb += dx02;
+        if (a > b) swap_uint16((uint16_t*)&a, (uint16_t*)&b);
+        ST7789_DrawHorizontalLine(a, y, b - a + 1, color);
+    }
+
+    // Parte de baixo do triângulo
+    sa = dx12 * (y - y1);
+    sb = dx02 * (y - y0);
+    for (; y <= y2; y++) {
+        a = x1 + sa / dy12;
+        b = x0 + sb / dy02;
+        sa += dx12;
+        sb += dx02;
+        if (a > b) swap_uint16((uint16_t*)&a, (uint16_t*)&b);
+        ST7789_DrawHorizontalLine(a, y, b - a + 1, color);
+    }
+}
+
+/**
+ * @brief Desenha o contorno de um círculo usando o algoritmo de ponto médio.
+ */
+void ST7789_DrawCircle(uint16_t x0, uint16_t y0, uint8_t r, uint16_t color) {
+    int16_t x = -r, y = 0, err = 2 - 2 * r;
+    do {
+        ST7789_DrawPixel(x0 - x, y0 + y, color);
+        ST7789_DrawPixel(x0 + x, y0 + y, color);
+        ST7789_DrawPixel(x0 + x, y0 - y, color);
+        ST7789_DrawPixel(x0 - x, y0 - y, color);
+        int16_t e2 = err;
+        if (e2 <= y) err += ++y * 2 + 1;
+        if (e2 > x || err > y) err += ++x * 2 + 1;
+    } while (x < 0);
+}
+
+/**
+ * @brief Preenche um círculo desenhando linhas horizontais.
+ */
+void ST7789_FillCircle(uint16_t x0, uint16_t y0, uint8_t r, uint16_t color) {
+    int16_t x = -r, y = 0, err = 2 - 2 * r;
+    do {
+        ST7789_DrawHorizontalLine(x0 + x, y0 - y, 2 * (-x) + 1, color);
+        ST7789_DrawHorizontalLine(x0 + x, y0 + y, 2 * (-x) + 1, color);
+        int16_t e2 = err;
+        if (e2 <= y) err += ++y * 2 + 1;
+        if (e2 > x || err > y) err += ++x * 2 + 1;
+    } while (x < 0);
+}
+
+// Função auxiliar para desenhar os cantos de um retângulo arredondado
+static void drawCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t cornername, uint16_t color) {
+    int16_t f = 1 - r;
+    int16_t ddF_x = 1;
+    int16_t ddF_y = -2 * r;
+    int16_t x = 0;
+    int16_t y = r;
+
+    while (x < y) {
+        if (f >= 0) {
+            y--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x++;
+        ddF_x += 2;
+        f += ddF_x;
+        if (cornername & 0x4) { // Canto superior direito
+            ST7789_DrawPixel(x0 + x, y0 - y, color);
+            ST7789_DrawPixel(x0 + y, y0 - x, color);
+        }
+        if (cornername & 0x2) { // Canto superior esquerdo
+            ST7789_DrawPixel(x0 - x, y0 - y, color);
+            ST7789_DrawPixel(x0 - y, y0 - x, color);
+        }
+        if (cornername & 0x8) { // Canto inferior direito
+            ST7789_DrawPixel(x0 + x, y0 + y, color);
+            ST7789_DrawPixel(x0 + y, y0 + x, color);
+        }
+        if (cornername & 0x1) { // Canto inferior esquerdo
+            ST7789_DrawPixel(x0 - x, y0 + y, color);
+            ST7789_DrawPixel(x0 - y, y0 + x, color);
+        }
+    }
+}
+
+// Função auxiliar para preencher os cantos de um retângulo arredondado
+static void fillCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t cornername, int16_t delta, uint16_t color) {
+    int16_t f = 1 - r;
+    int16_t ddF_x = 1;
+    int16_t ddF_y = -2 * r;
+    int16_t x = 0;
+    int16_t y = r;
+
+    while (x < y) {
+        if (f >= 0) {
+            y--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x++;
+        ddF_x += 2;
+        f += ddF_x;
+
+        if (cornername & 0x1) { // Superior esquerdo
+            ST7789_DrawVerticalLine(x0 - y, y0 - x, 2 * x + 1 + delta, color);
+            ST7789_DrawVerticalLine(x0 - x, y0 - y, 2 * y + 1 + delta, color);
+        }
+        if (cornername & 0x2) { // Superior direito
+            ST7789_DrawVerticalLine(x0 + x, y0 - y, 2 * y + 1 + delta, color);
+            ST7789_DrawVerticalLine(x0 + y, y0 - x, 2 * x + 1 + delta, color);
+        }
+    }
+}
+
+
+/**
+ * @brief Desenha o contorno de um retângulo com cantos arredondados.
+ */
+void ST7789_DrawRoundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, uint16_t color) {
+    // Desenha as linhas retas
+    ST7789_DrawHorizontalLine(x + r, y, w - 2 * r, color);
+    ST7789_DrawHorizontalLine(x + r, y + h - 1, w - 2 * r, color);
+    ST7789_DrawVerticalLine(x, y + r, h - 2 * r, color);
+    ST7789_DrawVerticalLine(x + w - 1, y + r, h - 2 * r, color);
+    // Desenha os quatro cantos
+    drawCircleHelper(x + r, y + r, r, 1, color);
+    drawCircleHelper(x + w - r - 1, y + r, r, 2, color);
+    drawCircleHelper(x + w - r - 1, y + h - r - 1, r, 4, color);
+    drawCircleHelper(x + r, y + h - r - 1, r, 8, color);
+}
+
+/**
+ * @brief Preenche um retângulo com cantos arredondados.
+ */
+void ST7789_FillRoundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, uint16_t color) {
+    // Preenche o retângulo central
+    ST7789_FillRectangle(x + r, y, w - 2 * r, h, color);
+    // Preenche as áreas laterais restantes
+    fillCircleHelper(x + w - r - 1, y + r, r, 1, h - 2 * r - 1, color);
+    fillCircleHelper(x + r, y + r, r, 2, h - 2 * r - 1, color);
+}
