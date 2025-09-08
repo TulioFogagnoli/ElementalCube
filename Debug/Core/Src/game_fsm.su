@@ -1,1 +1,2 @@
-../Core/Src/game_fsm.c:4:6:vInitBattle	16	static
+../Core/Src/game_fsm.c:28:6:vInitBattle	32	static
+../Core/Src/game_fsm.c:95:16:eGetAttackOutcome	16	static

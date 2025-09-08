@@ -1,6 +1,7 @@
 #include "game_screen.h"
 #include "st7789.h"
 #include "stdint.h"
+#include <stdio.h>
 
 void ClearScreen() {
     ST7789_FillRectangle(0, 0, 240, 240, ST7789_BLACK);

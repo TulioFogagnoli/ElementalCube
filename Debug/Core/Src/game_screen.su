@@ -1,2 +1,2 @@
-../Core/Src/game_screen.c:5:6:ClearScreen	16	static
-../Core/Src/game_screen.c:9:6:DrawMenu	72	static
+../Core/Src/game_screen.c:6:6:ClearScreen	16	static
+../Core/Src/game_screen.c:10:6:DrawMenu	72	static

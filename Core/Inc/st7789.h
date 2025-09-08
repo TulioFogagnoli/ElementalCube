@@ -20,6 +20,7 @@
 #define ST7789_YELLOW  0xFFE0
 #define ST7789_WHITE   0xFFFF
 #define ST7789_BROWN   0x51E0
+#define ST7789_GRAY    0x630C
 
 // Funções públicas existentes
 void ST7789_Init(void);

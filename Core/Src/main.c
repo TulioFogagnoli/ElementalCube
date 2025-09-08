@@ -29,6 +29,10 @@
 #include "game_fsm.h"
 #include "game_types.h"
 #include "game_screen.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,7 +63,9 @@ volatile EGameStates eCurrentState = eInitGame;
 volatile int selectedOption = 0;
 volatile uint8_t u8CleanScreen = TRUE;
 volatile EDificult selectedDifficulty;
-volatile EWizard selectedPersona;
+volatile EWizard eUserPlayer;
+volatile EWizard eCpuPlayer;
+
 volatile uint8_t u8ContAttack = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
@@ -123,9 +129,7 @@ int main(void)
   // Exemplo de uma função de texto (você precisará ter uma parecida)
   // ST7789_DrawText(10, 10, "Pressione uma tecla:", ST7789_WHITE);
   
-  char keyPressed;
-  char displayBuffer[20];
-  /* USER CODE END 2 */
+    /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -382,18 +386,17 @@ void StartInputHalTask(void const * argument)
 void StartGameTask(void const * argument)
 {
   char cLocalKeyPressed;
-
   for(;;)
   {
     cLocalKeyPressed = NONE_KEY;
-
+    
     osMutexWait(gameMutexHandle, osWaitForever);
     if (keyPressed != NONE_KEY) {
-        cLocalKeyPressed = keyPressed;
-        keyPressed = NONE_KEY; 
+      cLocalKeyPressed = keyPressed;
+      keyPressed = NONE_KEY; 
     }
     osMutexRelease(gameMutexHandle);
-
+    
     if (cLocalKeyPressed != NONE_KEY)
     {
       osMutexWait(gameMutexHandle, osWaitForever);
@@ -401,6 +404,8 @@ void StartGameTask(void const * argument)
       {
         case eInitGame:
         {
+          eUserPlayer.u8HeartPoints = 100;
+          eCpuPlayer.u8HeartPoints = 100;
           if(cLocalKeyPressed == CONFIRM_KEY)
           {
             eCurrentState = eDificultSelect;
@@ -470,12 +475,21 @@ void StartGameTask(void const * argument)
             }
             case CONFIRM_KEY:
             {
-              selectedPersona.ePersonaElemental = (EElemental)selectedOption;
+              eUserPlayer.ePersonaElemental = (EElemental)selectedOption;
               eCurrentState = eBattleInit;
               u8CleanScreen = TRUE;
               u8ContAttack = 0;     // Zera o contador de ataques
               selectedOption = 0;   // Inicia com a primeira opção (Fogo) pré-selecionada
 
+              memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
+              memset((void*)eCpuPlayer.eAttackSequential, 0, sizeof(eCpuPlayer.eAttackSequential));
+
+              srand(HAL_GetTick()); 
+              eCpuPlayer.ePersonaElemental = (rand() % 6);
+              for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
+              {
+                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6); 
+              }
               break;
             }
             default:
@@ -517,16 +531,17 @@ void StartGameTask(void const * argument)
             {
               switch(selectedOption)
               {
-                  case 0: selectedPersona.eAttackSequential[u8ContAttack] = eRed;    break;
-                  case 1: selectedPersona.eAttackSequential[u8ContAttack] = eBlue;   break;
-                  case 2: selectedPersona.eAttackSequential[u8ContAttack] = eGreen;  break;
-                  case 3: selectedPersona.eAttackSequential[u8ContAttack] = eYellow; break;
+                  case 0: eUserPlayer.eAttackSequential[u8ContAttack] = eRed;    break;
+                  case 1: eUserPlayer.eAttackSequential[u8ContAttack] = eBlue;   break;
+                  case 2: eUserPlayer.eAttackSequential[u8ContAttack] = eGreen;  break;
+                  case 3: eUserPlayer.eAttackSequential[u8ContAttack] = eYellow; break;
               }
               
               u8ContAttack++; 
               
-              if (u8ContAttack >= 4)
+              if (u8ContAttack >= ATTACKS_NUMBERS)
               {
+                vInitBattle(&eUserPlayer, &eCpuPlayer);
                 eCurrentState = ePlayerTurn;
               }
               
@@ -549,8 +564,25 @@ void StartGameTask(void const * argument)
         case ePlayerTurn:
         {
           if(cLocalKeyPressed == CONFIRM_KEY)
-          {
-            eCurrentState = eEndGame;
+          {            
+            if (eUserPlayer.u8HeartPoints == 0 || eCpuPlayer.u8HeartPoints == 0)
+            {
+              eCurrentState = eEndGame; 
+            }
+            else
+            {
+              // Ninguém perdeu, volta para selecionar novos ataques
+              eCurrentState = eBattleInit;
+              u8ContAttack = 0; // Prepara para o novo round
+              selectedOption = 0;
+              memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
+              
+              // Gera novos ataques para a CPU para o próximo round
+              for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
+              {
+                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6);
+              }
+            }
             u8CleanScreen = TRUE;
           }
           break;
@@ -619,48 +651,144 @@ void StartDisplayTask(void const * argument)
           case eBattleInit:
           {
             sprintf(buffer, "Selecione o %d ataque", (u8ContAttack + 1));
-            ST7789_DrawText(10, 10, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ST7789_DrawText(10, 5, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
 
             uint16_t colorFogo  = (selectedOption == 0) ? ST7789_YELLOW : ST7789_WHITE;
             uint16_t colorAgua  = (selectedOption == 1) ? ST7789_YELLOW : ST7789_WHITE;
             uint16_t colorAr    = (selectedOption == 2) ? ST7789_YELLOW : ST7789_WHITE;
             uint16_t colorTerra = (selectedOption == 3) ? ST7789_YELLOW : ST7789_WHITE;
 
-            ST7789_FillRectangle(10, 40, 20, 20, ST7789_RED);
-            ST7789_DrawText(40, 45, "A - Fogo", colorFogo, ST7789_BLACK, ST7789_SIZE);
+            ST7789_FillRectangle(10, 30, 20, 20, ST7789_RED);
+            ST7789_DrawText(40, 30, "A - Fogo", colorFogo, ST7789_BLACK, ST7789_SIZE);
 
-            ST7789_FillRectangle(10, 70, 20, 20, ST7789_BLUE);
-            ST7789_DrawText(40, 75, "B - Agua", colorAgua, ST7789_BLACK, ST7789_SIZE);
+            ST7789_FillRectangle(10, 60, 20, 20, ST7789_BLUE);
+            ST7789_DrawText(40, 60, "B - Agua", colorAgua, ST7789_BLACK, ST7789_SIZE);
 
-            ST7789_FillRectangle(10, 100, 20, 20, ST7789_CYAN);
-            ST7789_DrawText(40, 105, "C - Ar", colorAr, ST7789_BLACK, ST7789_SIZE);
+            ST7789_FillRectangle(10, 90, 20, 20, ST7789_CYAN);
+            ST7789_DrawText(40, 90, "C - Ar", colorAr, ST7789_BLACK, ST7789_SIZE);
 
-            ST7789_FillRectangle(10, 130, 20, 20, ST7789_BROWN);
-            ST7789_DrawText(40, 135, "D - Terra", colorTerra, ST7789_BLACK, ST7789_SIZE);
+            ST7789_FillRectangle(10, 120, 20, 20, ST7789_BROWN);
+            ST7789_DrawText(40, 120, "D - Terra", colorTerra, ST7789_BLACK, ST7789_SIZE);
+
+            ST7789_DrawText(10, 145, "Player:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ST7789_DrawText(10, 190, "CPU:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+
+            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
+            {
+              uint8_t showAttack = FALSE;
+              if (selectedDifficulty == eDificultEasy)
+              {
+                showAttack = TRUE; 
+              }
+              else if (selectedDifficulty == eDificultMedium)
+              {
+                if (i == 0 || i == 2) 
+                {
+                  showAttack = TRUE;
+                }
+              }
+              
+              if(showAttack)
+              {
+                uint16_t attackColor = ST7789_WHITE;
+                switch(eCpuPlayer.eAttackSequential[i])
+                {
+                    case eRed:    attackColor = ST7789_RED;   break;
+                    case eBlue:   attackColor = ST7789_BLUE;  break;
+                    case eGreen:  attackColor = ST7789_CYAN;  break;
+                    case eYellow: attackColor = ST7789_BROWN; break;
+                    case eWhite:  attackColor = ST7789_WHITE; break;
+                    case eBlack:  attackColor = ST7789_GRAY;  break;
+                }
+                ST7789_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
+              }
+              else
+              {
+                ST7789_DrawText(10 + (i * 30), 210, "??", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+              }
+            }
 
             for(uint8_t i = 0; i < u8ContAttack; i++)
             {
-              char* attackName = "";
               uint16_t attackColor = ST7789_WHITE;
-              switch(selectedPersona.eAttackSequential[i])
+              switch(eUserPlayer.eAttackSequential[i])
               {
                   case eRed:    attackColor = ST7789_RED;   break;
                   case eBlue:   attackColor = ST7789_BLUE;  break;
                   case eGreen:  attackColor = ST7789_CYAN;  break;
                   case eYellow: attackColor = ST7789_BROWN; break;
+                  case eWhite:  attackColor = ST7789_WHITE; break;
+                  case eBlack:  attackColor = ST7789_GRAY;  break;
               }
-              ST7789_FillRectangle(10 + (i * 30), 180, 20, 20, attackColor);
+              ST7789_FillRectangle(10 + (i * 30), 160, 20, 20, attackColor);
             }
             break;
           }
           case ePlayerTurn:
           {
-            ST7789_DrawText(10, 10, "Seu Turno!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ST7789_DrawText(10, 10, "Resultado do Round", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+
+            // Exibe a vida atual de ambos
+            sprintf(buffer, "Sua Vida: %d", eUserPlayer.u8HeartPoints);
+            ST7789_DrawText(10, 40, buffer, ST7789_GREEN, ST7789_BLACK, ST7789_SIZE);
+
+            sprintf(buffer, "Vida CPU: %d", eCpuPlayer.u8HeartPoints);
+            ST7789_DrawText(10, 60, buffer, ST7789_RED, ST7789_BLACK, ST7789_SIZE);
+
+            // Mostra as sequências de ataque que acabaram de ser usadas
+            ST7789_DrawText(10, 90, "Seus Ataques:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
+            {
+                uint16_t attackColor = ST7789_WHITE;
+                switch(eUserPlayer.eAttackSequential[i])
+                {
+                    case eRed:    attackColor = ST7789_RED;   break;
+                    case eBlue:   attackColor = ST7789_BLUE;  break;
+                    case eGreen:  attackColor = ST7789_CYAN;  break;
+                    case eYellow: attackColor = ST7789_BROWN; break;
+                    case eWhite:  attackColor = ST7789_WHITE; break;
+                    case eBlack:  attackColor = ST7789_GRAY;  break;
+                }
+                ST7789_FillRectangle(10 + (i * 30), 110, 20, 20, attackColor);
+            }
+
+            ST7789_DrawText(10, 140, "Ataques CPU:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
+            {
+                uint16_t attackColor = ST7789_WHITE;
+                switch(eCpuPlayer.eAttackSequential[i])
+                {
+                    case eRed:    attackColor = ST7789_RED;   break;
+                    case eBlue:   attackColor = ST7789_BLUE;  break;
+                    case eGreen:  attackColor = ST7789_CYAN;  break;
+                    case eYellow: attackColor = ST7789_BROWN; break;
+                    case eWhite:  attackColor = ST7789_WHITE; break;
+                    case eBlack:  attackColor = ST7789_GRAY;  break;
+                }
+                ST7789_FillRectangle(10 + (i * 30), 160, 20, 20, attackColor);
+            }
+
+            ST7789_DrawText(10, 200, "Pressione * para continuar...", ST7789_YELLOW, ST7789_BLACK, ST7789_SIZE);
+            break;
             break;
           }
           case eEndGame:
           {
-            ST7789_DrawText(10, 10, "Fim de Jogo!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            if (eUserPlayer.u8HeartPoints > 0)
+            {
+                ST7789_DrawText(10, 10, "VITORIA!", ST7789_GREEN, ST7789_BLACK, ST7789_SIZE);
+            }
+            else
+            {
+                ST7789_DrawText(10, 10, "DERROTA!", ST7789_RED, ST7789_BLACK, ST7789_SIZE);
+            }
+
+            sprintf(buffer, "Sua Vida Final: %d", eUserPlayer.u8HeartPoints);
+            ST7789_DrawText(10, 40, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            sprintf(buffer, "Vida Final CPU: %d", eCpuPlayer.u8HeartPoints);
+            ST7789_DrawText(10, 60, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+
+            ST7789_DrawText(10, 100, "Pressione * para recomecar", ST7789_YELLOW, ST7789_BLACK, ST7789_SIZE);
             break;
           }
           default:

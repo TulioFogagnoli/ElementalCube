@@ -1,6 +1,7 @@
 #include "st7789.h"
 #include "main.h" // Para acessar os defines dos pinos e a instância do SPI
 #include "font.h" 
+#include <stdlib.h>
 
 // Associe a instância do SPI gerada pelo CubeIDE
 extern SPI_HandleTypeDef hspi1;
