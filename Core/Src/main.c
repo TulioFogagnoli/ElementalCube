@@ -22,9 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "st7789.h"
+#include "ili9341.h"
 #include "keypad.h"
-#include "font.h"
+#include "fonts.h"
 
 #include "game_fsm.h"
 #include "game_types.h"
@@ -123,13 +123,9 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
-  ST7789_Init();
-  ST7789_FillScreen(ST7789_BLACK);
-
-  // Exemplo de uma função de texto (você precisará ter uma parecida)
-  // ST7789_DrawText(10, 10, "Pressione uma tecla:", ST7789_WHITE);
-  
-    /* USER CODE END 2 */
+  ILI9341_Init();
+  ILI9341_FillScreen(ILI9341_BLACK);
+  /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -202,7 +198,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 50;
+  RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -216,10 +212,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -245,10 +241,10 @@ static void MX_SPI1_Init(void)
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
-  hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -314,50 +310,44 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1|LCD_DC_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, C1_Pin|C2_Pin|C3_Pin|C4_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : PC1 LCD_DC_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_1|LCD_DC_Pin;
+ /* Configure LCD_CS_Pin (PB12) */
+  GPIO_InitStruct.Pin = LCD_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  HAL_GPIO_Init(LCD_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LCD_RST_Pin */
+  /* Configure LCD_DC_Pin (PC4) - ESTE É O PINO CRÍTICO */
+  GPIO_InitStruct.Pin = LCD_DC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LCD_DC_GPIO_Port, &GPIO_InitStruct);
+
+  /* Configure LCD_RST_Pin (PB0) */
   GPIO_InitStruct.Pin = LCD_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_RST_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : C1_Pin C2_Pin C3_Pin C4_Pin */
+  /*Configure GPIO pins : C1_Pin C2_Pin C3_Pin C4_Pin (Keypad) */
   GPIO_InitStruct.Pin = C1_Pin|C2_Pin|C3_Pin|C4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : R1_Pin R2_Pin R3_Pin R4_Pin */
+  /*Configure GPIO pins : R1_Pin R2_Pin R3_Pin R4_Pin (Keypad) */
   GPIO_InitStruct.Pin = R1_Pin|R2_Pin|R3_Pin|R4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : LCD_CS_Pin */
-  GPIO_InitStruct.Pin = LCD_CS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LCD_CS_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   /* USER CODE END MX_GPIO_Init_2 */
@@ -617,14 +607,12 @@ void StartDisplayTask(void const * argument)
   uint8_t u8RedrawScreen = FALSE;
   for(;;)
   {
-
     osMutexWait(gameMutexHandle, osWaitForever);
     if (TRUE == u8CleanScreen) {
         u8RedrawScreen = TRUE;
-        u8CleanScreen = FALSE; 
+        u8CleanScreen = FALSE;
     }
     osMutexRelease(gameMutexHandle);
-
 
     if(TRUE == u8RedrawScreen)
     {
@@ -634,8 +622,8 @@ void StartDisplayTask(void const * argument)
       {
           case eInitGame:
           {
-            ST7789_DrawText(10, 10, "ElementalCube!", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-            ST7789_DrawText(10, 40, "Pressione *", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ILI9341_WriteString(40, 120, "ElementalCube!", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(60, 160, "Pressione *", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
             break;
           }
           case eDificultSelect:
@@ -651,149 +639,111 @@ void StartDisplayTask(void const * argument)
           case eBattleInit:
           {
             sprintf(buffer, "Selecione o %d ataque", (u8ContAttack + 1));
-            ST7789_DrawText(10, 5, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ILI9341_WriteString(10, 15, buffer, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
 
-            uint16_t colorFogo  = (selectedOption == 0) ? ST7789_YELLOW : ST7789_WHITE;
-            uint16_t colorAgua  = (selectedOption == 1) ? ST7789_YELLOW : ST7789_WHITE;
-            uint16_t colorAr    = (selectedOption == 2) ? ST7789_YELLOW : ST7789_WHITE;
-            uint16_t colorTerra = (selectedOption == 3) ? ST7789_YELLOW : ST7789_WHITE;
+            uint16_t colorFogo  = (selectedOption == 0) ? ILI9341_YELLOW : ILI9341_WHITE;
+            uint16_t colorAgua  = (selectedOption == 1) ? ILI9341_YELLOW : ILI9341_WHITE;
+            uint16_t colorAr    = (selectedOption == 2) ? ILI9341_YELLOW : ILI9341_WHITE;
+            uint16_t colorTerra = (selectedOption == 3) ? ILI9341_YELLOW : ILI9341_WHITE;
 
-            ST7789_FillRectangle(10, 30, 20, 20, ST7789_RED);
-            ST7789_DrawText(40, 30, "A - Fogo", colorFogo, ST7789_BLACK, ST7789_SIZE);
-
-            ST7789_FillRectangle(10, 60, 20, 20, ST7789_BLUE);
-            ST7789_DrawText(40, 60, "B - Agua", colorAgua, ST7789_BLACK, ST7789_SIZE);
-
-            ST7789_FillRectangle(10, 90, 20, 20, ST7789_CYAN);
-            ST7789_DrawText(40, 90, "C - Ar", colorAr, ST7789_BLACK, ST7789_SIZE);
-
-            ST7789_FillRectangle(10, 120, 20, 20, ST7789_BROWN);
-            ST7789_DrawText(40, 120, "D - Terra", colorTerra, ST7789_BLACK, ST7789_SIZE);
-
-            ST7789_DrawText(10, 145, "Player:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-            ST7789_DrawText(10, 190, "CPU:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ILI9341_FillRectangle(10, 50, 25, 25, ILI9341_RED);
+            ILI9341_WriteString(45, 55, "A - Fogo", Font_7x10, colorFogo, ILI9341_BLACK);
+            ILI9341_FillRectangle(10, 85, 25, 25, ILI9341_BLUE);
+            ILI9341_WriteString(45, 90, "B - Agua", Font_7x10, colorAgua, ILI9341_BLACK);
+            ILI9341_FillRectangle(10, 120, 25, 25, ILI9341_CYAN);
+            ILI9341_WriteString(45, 125, "C - Ar", Font_7x10, colorAr, ILI9341_BLACK);
+            ILI9341_FillRectangle(10, 155, 25, 25, ILI9341_BROWN);
+            ILI9341_WriteString(45, 160, "D - Terra", Font_7x10, colorTerra, ILI9341_BLACK);
+            ILI9341_WriteString(10, 200, "Player:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(10, 250, "CPU:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
 
             for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
             {
               uint8_t showAttack = FALSE;
-              if (selectedDifficulty == eDificultEasy)
-              {
-                showAttack = TRUE; 
-              }
-              else if (selectedDifficulty == eDificultMedium)
-              {
-                if (i == 0 || i == 2) 
-                {
-                  showAttack = TRUE;
+              if (selectedDifficulty == eDificultEasy) { showAttack = TRUE; }
+              else if (selectedDifficulty == eDificultMedium) { if (i == 0 || i == 2) { showAttack = TRUE; } }
+              if(showAttack) {
+                uint16_t attackColor = ILI9341_WHITE;
+                switch(eCpuPlayer.eAttackSequential[i]) {
+                    case eRed:    attackColor = ILI9341_RED;   break;
+                    case eBlue:   attackColor = ILI9341_BLUE;  break;
+                    case eGreen:  attackColor = ILI9341_CYAN;  break;
+                    case eYellow: attackColor = ILI9341_BROWN; break;
+                    case eWhite:  attackColor = ILI9341_WHITE; break;
+                    case eBlack:  attackColor = ILI9341_GRAY;  break;
                 }
-              }
-              
-              if(showAttack)
-              {
-                uint16_t attackColor = ST7789_WHITE;
-                switch(eCpuPlayer.eAttackSequential[i])
-                {
-                    case eRed:    attackColor = ST7789_RED;   break;
-                    case eBlue:   attackColor = ST7789_BLUE;  break;
-                    case eGreen:  attackColor = ST7789_CYAN;  break;
-                    case eYellow: attackColor = ST7789_BROWN; break;
-                    case eWhite:  attackColor = ST7789_WHITE; break;
-                    case eBlack:  attackColor = ST7789_GRAY;  break;
-                }
-                ST7789_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
-              }
-              else
-              {
-                ST7789_DrawText(10 + (i * 30), 210, "??", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+                ILI9341_FillRectangle(10 + (i * 30), 270, 20, 20, attackColor);
+              } else {
+                ILI9341_WriteString(10 + (i * 30), 270, "??", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
               }
             }
-
-            for(uint8_t i = 0; i < u8ContAttack; i++)
-            {
-              uint16_t attackColor = ST7789_WHITE;
-              switch(eUserPlayer.eAttackSequential[i])
-              {
-                  case eRed:    attackColor = ST7789_RED;   break;
-                  case eBlue:   attackColor = ST7789_BLUE;  break;
-                  case eGreen:  attackColor = ST7789_CYAN;  break;
-                  case eYellow: attackColor = ST7789_BROWN; break;
-                  case eWhite:  attackColor = ST7789_WHITE; break;
-                  case eBlack:  attackColor = ST7789_GRAY;  break;
+            for(uint8_t i = 0; i < u8ContAttack; i++) {
+              uint16_t attackColor = ILI9341_WHITE;
+              switch(eUserPlayer.eAttackSequential[i]) {
+                  case eRed:    attackColor = ILI9341_RED;   break;
+                  case eBlue:   attackColor = ILI9341_BLUE;  break;
+                  case eGreen:  attackColor = ILI9341_CYAN;  break;
+                  case eYellow: attackColor = ILI9341_BROWN; break;
+                  case eWhite:  attackColor = ILI9341_WHITE; break;
+                  case eBlack:  attackColor = ILI9341_GRAY;  break;
               }
-              ST7789_FillRectangle(10 + (i * 30), 160, 20, 20, attackColor);
+              ILI9341_FillRectangle(10 + (i * 30), 220, 20, 20, attackColor);
             }
             break;
           }
           case ePlayerTurn:
           {
-            ST7789_DrawText(10, 10, "Resultado do Round", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-
-            // Exibe a vida atual de ambos
+            ILI9341_WriteString(10, 20, "Resultado do Round", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
             sprintf(buffer, "Sua Vida: %d", eUserPlayer.u8HeartPoints);
-            ST7789_DrawText(10, 40, buffer, ST7789_GREEN, ST7789_BLACK, ST7789_SIZE);
-
+            ILI9341_WriteString(10, 60, buffer, Font_11x18, ILI9341_GREEN, ILI9341_BLACK);
             sprintf(buffer, "Vida CPU: %d", eCpuPlayer.u8HeartPoints);
-            ST7789_DrawText(10, 60, buffer, ST7789_RED, ST7789_BLACK, ST7789_SIZE);
-
-            // Mostra as sequências de ataque que acabaram de ser usadas
-            ST7789_DrawText(10, 90, "Seus Ataques:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
-            {
-                uint16_t attackColor = ST7789_WHITE;
-                switch(eUserPlayer.eAttackSequential[i])
-                {
-                    case eRed:    attackColor = ST7789_RED;   break;
-                    case eBlue:   attackColor = ST7789_BLUE;  break;
-                    case eGreen:  attackColor = ST7789_CYAN;  break;
-                    case eYellow: attackColor = ST7789_BROWN; break;
-                    case eWhite:  attackColor = ST7789_WHITE; break;
-                    case eBlack:  attackColor = ST7789_GRAY;  break;
+            ILI9341_WriteString(10, 90, buffer, Font_11x18, ILI9341_RED, ILI9341_BLACK);
+            ILI9341_WriteString(10, 130, "Seus Ataques:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
+                uint16_t attackColor = ILI9341_WHITE;
+                switch(eUserPlayer.eAttackSequential[i]) {
+                    case eRed:    attackColor = ILI9341_RED;   break;
+                    case eBlue:   attackColor = ILI9341_BLUE;  break;
+                    case eGreen:  attackColor = ILI9341_CYAN;  break;
+                    case eYellow: attackColor = ILI9341_BROWN; break;
+                    case eWhite:  attackColor = ILI9341_WHITE; break;
+                    case eBlack:  attackColor = ILI9341_GRAY;  break;
                 }
-                ST7789_FillRectangle(10 + (i * 30), 110, 20, 20, attackColor);
+                ILI9341_FillRectangle(10 + (i * 30), 150, 20, 20, attackColor);
             }
-
-            ST7789_DrawText(10, 140, "Ataques CPU:", ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
-            {
-                uint16_t attackColor = ST7789_WHITE;
-                switch(eCpuPlayer.eAttackSequential[i])
-                {
-                    case eRed:    attackColor = ST7789_RED;   break;
-                    case eBlue:   attackColor = ST7789_BLUE;  break;
-                    case eGreen:  attackColor = ST7789_CYAN;  break;
-                    case eYellow: attackColor = ST7789_BROWN; break;
-                    case eWhite:  attackColor = ST7789_WHITE; break;
-                    case eBlack:  attackColor = ST7789_GRAY;  break;
+            ILI9341_WriteString(10, 190, "Ataques CPU:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
+                uint16_t attackColor = ILI9341_WHITE;
+                switch(eCpuPlayer.eAttackSequential[i]) {
+                    case eRed:    attackColor = ILI9341_RED;   break;
+                    case eBlue:   attackColor = ILI9341_BLUE;  break;
+                    case eGreen:  attackColor = ILI9341_CYAN;  break;
+                    case eYellow: attackColor = ILI9341_BROWN; break;
+                    case eWhite:  attackColor = ILI9341_WHITE; break;
+                    case eBlack:  attackColor = ILI9341_GRAY;  break;
                 }
-                ST7789_FillRectangle(10 + (i * 30), 160, 20, 20, attackColor);
+                ILI9341_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
             }
-
-            ST7789_DrawText(10, 200, "Pressione * para continuar...", ST7789_YELLOW, ST7789_BLACK, ST7789_SIZE);
-            break;
+            ILI9341_WriteString(10, 280, "Pressione * para continuar...", Font_7x10, ILI9341_YELLOW, ILI9341_BLACK);
             break;
           }
           case eEndGame:
           {
-            if (eUserPlayer.u8HeartPoints > 0)
-            {
-                ST7789_DrawText(10, 10, "VITORIA!", ST7789_GREEN, ST7789_BLACK, ST7789_SIZE);
+            if (eUserPlayer.u8HeartPoints > 0) {
+                ILI9341_WriteString(70, 80, "VITORIA!", Font_11x18, ILI9341_GREEN, ILI9341_BLACK);
+            } else {
+                ILI9341_WriteString(70, 80, "DERROTA!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
             }
-            else
-            {
-                ST7789_DrawText(10, 10, "DERROTA!", ST7789_RED, ST7789_BLACK, ST7789_SIZE);
-            }
-
             sprintf(buffer, "Sua Vida Final: %d", eUserPlayer.u8HeartPoints);
-            ST7789_DrawText(10, 40, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
+            ILI9341_WriteString(10, 140, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
             sprintf(buffer, "Vida Final CPU: %d", eCpuPlayer.u8HeartPoints);
-            ST7789_DrawText(10, 60, buffer, ST7789_WHITE, ST7789_BLACK, ST7789_SIZE);
-
-            ST7789_DrawText(10, 100, "Pressione * para recomecar", ST7789_YELLOW, ST7789_BLACK, ST7789_SIZE);
+            ILI9341_WriteString(10, 160, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(10, 250, "Pressione * para recomecar", Font_7x10, ILI9341_YELLOW, ILI9341_BLACK);
             break;
           }
           default:
           {
-            ST7789_DrawText(10, 10, "Erro de Estado!", ST7789_RED, ST7789_BLACK, ST7789_SIZE);
+            ILI9341_WriteString(10, 10, "Erro de Estado!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
             break;
           }
       }
@@ -803,6 +753,7 @@ void StartDisplayTask(void const * argument)
   }
   /* USER CODE END StartDisplayTask */
 }
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None

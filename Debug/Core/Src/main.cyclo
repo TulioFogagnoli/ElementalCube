@@ -1,9 +1,9 @@
 ../Core/Src/main.c:97:5:main	1
-../Core/Src/main.c:186:6:SystemClock_Config	3
-../Core/Src/main.c:233:13:MX_SPI1_Init	2
-../Core/Src/main.c:271:13:MX_UART4_Init	2
-../Core/Src/main.c:304:13:MX_GPIO_Init	1
-../Core/Src/main.c:370:6:StartInputHalTask	2
-../Core/Src/main.c:386:6:StartGameTask	39
-../Core/Src/main.c:613:6:StartDisplayTask	47
-../Core/Src/main.c:810:6:Error_Handler	1
+../Core/Src/main.c:182:6:SystemClock_Config	3
+../Core/Src/main.c:229:13:MX_SPI1_Init	2
+../Core/Src/main.c:267:13:MX_UART4_Init	2
+../Core/Src/main.c:300:13:MX_GPIO_Init	1
+../Core/Src/main.c:360:6:StartInputHalTask	2
+../Core/Src/main.c:376:6:StartGameTask	39
+../Core/Src/main.c:603:6:StartDisplayTask	47
+../Core/Src/main.c:761:6:Error_Handler	1
