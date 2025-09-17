@@ -23,8 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "ili9341.h"
-#include "keypad.h"
 #include "fonts.h"
+#include "keypad.h"
 
 #include "game_fsm.h"
 #include "game_types.h"
@@ -42,6 +42,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,6 +52,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
+
 UART_HandleTypeDef huart4;
 
 osThreadId inputHalTaskHandle;
@@ -76,8 +78,8 @@ const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agu
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_UART4_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_UART4_Init(void);
 void StartInputHalTask(void const * argument);
 void StartGameTask(void const * argument);
 void StartDisplayTask(void const * argument);
@@ -119,12 +121,30 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_UART4_Init();
   MX_SPI1_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
 
+  //--------------------------------------------------------------------
+  // ETAPA DE INICIALIZAÇÃO
+  //--------------------------------------------------------------------
+
+  // 1. Inicializa o display. Ele usará a velocidade alta do SPI configurada
+  //    no MX_SPI1_Init(), o que é ótimo para performance gráfica.
   ILI9341_Init();
+
+  // 2. Acende o backlight do display.
+  //    (Assumindo que seu pino é o LCD_LED_Pin, como no seu MX_GPIO_Init)
+  HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_SET);
+
+  // 3. Prepara a tela para o usuário com uma mensagem de boas-vindas.
   ILI9341_FillScreen(ILI9341_BLACK);
+  ILI9341_WriteString(20, 120, "Sistema Iniciado!", Font_7x10, ILI9341_GREEN, ILI9341_BLACK);
+  HAL_Delay(2000); // Uma pequena pausa para o usuário ler a mensagem.
+
+  // 4. Limpa a tela para começar a desenhar.
+  ILI9341_FillScreen(ILI9341_BLACK);
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -144,6 +164,7 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
+  /* definition and creation of defaultTask */
   osMutexDef(gameMutex);
   gameMutexHandle = osMutexCreate(osMutex(gameMutex));
 
@@ -155,6 +176,7 @@ int main(void)
 
   osThreadDef(displayTask, StartDisplayTask, osPriorityNormal, 0, 256);
   displayTaskHandle = osThreadCreate(osThread(displayTask), NULL);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -171,6 +193,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    
   }
   /* USER CODE END 3 */
 }
@@ -301,55 +324,63 @@ static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
+
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LCD_RST_Pin|LCD_DC_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, C1_Pin|C2_Pin|C3_Pin|C4_Pin, GPIO_PIN_RESET);
 
- /* Configure LCD_CS_Pin (PB12) */
+  /*Configure GPIO pin : LCD_CS_Pin */
   GPIO_InitStruct.Pin = LCD_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /* Configure LCD_DC_Pin (PC4) - ESTE É O PINO CRÍTICO */
-  GPIO_InitStruct.Pin = LCD_DC_Pin;
+  /*Configure GPIO pins : LCD_RST_Pin LCD_DC_Pin */
+  GPIO_InitStruct.Pin = LCD_RST_Pin|LCD_DC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LCD_DC_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /* Configure LCD_RST_Pin (PB0) */
-  GPIO_InitStruct.Pin = LCD_RST_Pin;
+  /*Configure GPIO pin : LCD_LED_Pin */
+  GPIO_InitStruct.Pin = LCD_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LCD_RST_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(LCD_LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : C1_Pin C2_Pin C3_Pin C4_Pin (Keypad) */
+  /*Configure GPIO pins : C1_Pin C2_Pin C3_Pin C4_Pin */
   GPIO_InitStruct.Pin = C1_Pin|C2_Pin|C3_Pin|C4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : R1_Pin R2_Pin R3_Pin R4_Pin (Keypad) */
+  /*Configure GPIO pins : R1_Pin R2_Pin R3_Pin R4_Pin */
   GPIO_InitStruct.Pin = R1_Pin|R2_Pin|R3_Pin|R4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
@@ -622,8 +653,8 @@ void StartDisplayTask(void const * argument)
       {
           case eInitGame:
           {
-            ILI9341_WriteString(40, 120, "ElementalCube!", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
-            ILI9341_WriteString(60, 160, "Pressione *", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(5, 30, "Pressione *", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
             break;
           }
           case eDificultSelect:
@@ -639,23 +670,23 @@ void StartDisplayTask(void const * argument)
           case eBattleInit:
           {
             sprintf(buffer, "Selecione o %d ataque", (u8ContAttack + 1));
-            ILI9341_WriteString(10, 15, buffer, Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(10, 15, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
 
             uint16_t colorFogo  = (selectedOption == 0) ? ILI9341_YELLOW : ILI9341_WHITE;
             uint16_t colorAgua  = (selectedOption == 1) ? ILI9341_YELLOW : ILI9341_WHITE;
             uint16_t colorAr    = (selectedOption == 2) ? ILI9341_YELLOW : ILI9341_WHITE;
             uint16_t colorTerra = (selectedOption == 3) ? ILI9341_YELLOW : ILI9341_WHITE;
 
-            ILI9341_FillRectangle(10, 50, 25, 25, ILI9341_RED);
-            ILI9341_WriteString(45, 55, "A - Fogo", Font_7x10, colorFogo, ILI9341_BLACK);
-            ILI9341_FillRectangle(10, 85, 25, 25, ILI9341_BLUE);
-            ILI9341_WriteString(45, 90, "B - Agua", Font_7x10, colorAgua, ILI9341_BLACK);
-            ILI9341_FillRectangle(10, 120, 25, 25, ILI9341_CYAN);
-            ILI9341_WriteString(45, 125, "C - Ar", Font_7x10, colorAr, ILI9341_BLACK);
-            ILI9341_FillRectangle(10, 155, 25, 25, ILI9341_BROWN);
-            ILI9341_WriteString(45, 160, "D - Terra", Font_7x10, colorTerra, ILI9341_BLACK);
-            ILI9341_WriteString(10, 200, "Player:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
-            ILI9341_WriteString(10, 250, "CPU:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_FillRectangle(5, 50, 20, 20, ILI9341_RED);
+            ILI9341_WriteString(40, 55, "A - Fogo", Font_7x10, colorFogo, ILI9341_BLACK);
+            ILI9341_FillRectangle(5, 85, 20, 20, ILI9341_BLUE);
+            ILI9341_WriteString(40, 90, "B - Agua", Font_7x10, colorAgua, ILI9341_BLACK);
+            ILI9341_FillRectangle(200, 50, 25, 25, ILI9341_CYAN);
+            ILI9341_WriteString(235, 55, "C - Ar", Font_7x10, colorAr, ILI9341_BLACK);
+            ILI9341_FillRectangle(200, 85, 25, 25, ILI9341_BROWN);
+            ILI9341_WriteString(235, 90, "D - Terra", Font_7x10, colorTerra, ILI9341_BLACK);
+            ILI9341_WriteString(5, 110, "Player:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(5, 150, "CPU:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
 
             for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
             {
@@ -672,9 +703,9 @@ void StartDisplayTask(void const * argument)
                     case eWhite:  attackColor = ILI9341_WHITE; break;
                     case eBlack:  attackColor = ILI9341_GRAY;  break;
                 }
-                ILI9341_FillRectangle(10 + (i * 30), 270, 20, 20, attackColor);
+                ILI9341_FillRectangle(5 + (i * 30), 160, 20, 20, attackColor);
               } else {
-                ILI9341_WriteString(10 + (i * 30), 270, "??", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+                ILI9341_WriteString(5 + (i * 30), 160, "??", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
               }
             }
             for(uint8_t i = 0; i < u8ContAttack; i++) {
@@ -687,17 +718,17 @@ void StartDisplayTask(void const * argument)
                   case eWhite:  attackColor = ILI9341_WHITE; break;
                   case eBlack:  attackColor = ILI9341_GRAY;  break;
               }
-              ILI9341_FillRectangle(10 + (i * 30), 220, 20, 20, attackColor);
+              ILI9341_FillRectangle(5 + (i * 30), 120, 20, 20, attackColor);
             }
             break;
           }
           case ePlayerTurn:
           {
-            ILI9341_WriteString(10, 20, "Resultado do Round", Font_11x18, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9341_WriteString(10, 20, "Resultado do Round", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
             sprintf(buffer, "Sua Vida: %d", eUserPlayer.u8HeartPoints);
-            ILI9341_WriteString(10, 60, buffer, Font_11x18, ILI9341_GREEN, ILI9341_BLACK);
+            ILI9341_WriteString(10, 60, buffer, Font_7x10, ILI9341_GREEN, ILI9341_BLACK);
             sprintf(buffer, "Vida CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9341_WriteString(10, 90, buffer, Font_11x18, ILI9341_RED, ILI9341_BLACK);
+            ILI9341_WriteString(10, 90, buffer, Font_7x10, ILI9341_RED, ILI9341_BLACK);
             ILI9341_WriteString(10, 130, "Seus Ataques:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
             for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
                 uint16_t attackColor = ILI9341_WHITE;
@@ -730,9 +761,9 @@ void StartDisplayTask(void const * argument)
           case eEndGame:
           {
             if (eUserPlayer.u8HeartPoints > 0) {
-                ILI9341_WriteString(70, 80, "VITORIA!", Font_11x18, ILI9341_GREEN, ILI9341_BLACK);
+                ILI9341_WriteString(70, 80, "VITORIA!", Font_7x10, ILI9341_GREEN, ILI9341_BLACK);
             } else {
-                ILI9341_WriteString(70, 80, "DERROTA!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+                ILI9341_WriteString(70, 80, "DERROTA!", Font_7x10, ILI9341_RED, ILI9341_BLACK);
             }
             sprintf(buffer, "Sua Vida Final: %d", eUserPlayer.u8HeartPoints);
             ILI9341_WriteString(10, 140, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
@@ -743,7 +774,7 @@ void StartDisplayTask(void const * argument)
           }
           default:
           {
-            ILI9341_WriteString(10, 10, "Erro de Estado!", Font_11x18, ILI9341_RED, ILI9341_BLACK);
+            ILI9341_WriteString(10, 10, "Erro de Estado!", Font_7x10, ILI9341_RED, ILI9341_BLACK);
             break;
           }
       }
@@ -768,8 +799,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.

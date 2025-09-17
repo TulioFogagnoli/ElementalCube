@@ -44,7 +44,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
  ../Core/Inc/ili9341.h ../Core/Inc/fonts.h ../Core/Inc/main.h \
- ../Core/Inc/keypad.h ../Core/Inc/fonts.h ../Core/Inc/game_fsm.h \
+ ../Core/Inc/fonts.h ../Core/Inc/keypad.h ../Core/Inc/game_fsm.h \
  ../Core/Inc/game_types.h ../Core/Inc/game_types.h \
  ../Core/Inc/game_screen.h
 ../Core/Inc/main.h:
@@ -95,8 +95,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/ili9341.h:
 ../Core/Inc/fonts.h:
 ../Core/Inc/main.h:
-../Core/Inc/keypad.h:
 ../Core/Inc/fonts.h:
+../Core/Inc/keypad.h:
 ../Core/Inc/game_fsm.h:
 ../Core/Inc/game_types.h:
 ../Core/Inc/game_types.h:
