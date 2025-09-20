@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "ILI9488.h"
+#include "TCS3472.h"
+
 #include "fonts.h"
 #include "keypad.h"
 
@@ -51,8 +53,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
 SPI_HandleTypeDef hspi1;
-
 UART_HandleTypeDef huart4;
 
 osThreadId inputHalTaskHandle;
@@ -67,7 +69,7 @@ volatile uint8_t u8CleanScreen = TRUE;
 volatile EDificult selectedDifficulty;
 volatile EWizard eUserPlayer;
 volatile EWizard eCpuPlayer;
-
+volatile TCS3472_Data colorData;
 volatile uint8_t u8ContAttack = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
@@ -80,6 +82,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_UART4_Init(void);
+static void MX_I2C1_Init(void);
 void StartInputHalTask(void const * argument);
 void StartGameTask(void const * argument);
 void StartDisplayTask(void const * argument);
@@ -123,6 +126,7 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_UART4_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   //--------------------------------------------------------------------
@@ -139,6 +143,17 @@ int main(void)
 
   // 3. Prepara a tela para o usuário com uma mensagem de boas-vindas.
   ILI9488_FillScreen(ILI9488_BLACK);
+  if (TCS3472_Init(&hi2c1))
+  {
+    // Sucesso! Mostra uma mensagem no display
+    ILI9488_WriteString(10, 200, "Sensor de Cor OK!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+  }
+  else
+  {
+    // Falha! Mostra uma mensagem de erro
+    ILI9488_WriteString(10, 200, "Erro no Sensor de Cor!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+  }
+
   ILI9488_WriteString(20, 120, "Sistema Iniciado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
   HAL_Delay(2000); // Uma pequena pausa para o usuário ler a mensagem.
 
@@ -242,6 +257,40 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
@@ -400,6 +449,7 @@ void StartInputHalTask(void const * argument)
     {
       keyPressed = cCurrent;
     }
+    TCS3472_ReadData(&hi2c1, &colorData);
     osDelay(50);
   }
 }
@@ -444,7 +494,7 @@ void StartGameTask(void const * argument)
               selectedOption = (selectedOption < MENU_OPTIONS_DIFFICULTY - 1) ? selectedOption + 1 : 0;
               u8CleanScreen = TRUE;
               break;
-            }
+  }
             case DOWN_KEY:
             {
               selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_DIFFICULTY - 1;
@@ -645,6 +695,8 @@ void StartDisplayTask(void const * argument)
     }
     osMutexRelease(gameMutexHandle);
 
+
+
     if(TRUE == u8RedrawScreen)
     {
       ClearScreen();
@@ -655,6 +707,11 @@ void StartDisplayTask(void const * argument)
           {
             ILI9488_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             ILI9488_WriteString(5, 30, "Pressione *", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+
+            sprintf(buffer, "R:%04u G:%04u", colorData.red, colorData.green);
+            ILI9488_WriteString(10, 200, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            sprintf(buffer, "B:%04u C:%04u", colorData.blue, colorData.clear);
+            ILI9488_WriteString(10, 220, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             break;
           }
           case eDificultSelect:

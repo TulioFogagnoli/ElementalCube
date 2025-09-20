@@ -1,0 +1,2 @@
+../Core/Src/TCS3472.c:20:6:TCS3472_Init	3
+../Core/Src/TCS3472.c:55:6:TCS3472_ReadData	1
