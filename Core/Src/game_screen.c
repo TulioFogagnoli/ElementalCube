@@ -1,11 +1,11 @@
 #include "game_screen.h"
-#include "ili9341.h"
+#include "ILI9488.h"
 #include "fonts.h"
 #include "stdint.h"
 #include <stdio.h>
 
 void ClearScreen() {
-    ILI9341_FillRectangle(0, 0, ILI9341_WIDTH, ILI9341_HEIGHT, ILI9341_BLACK);
+    ILI9488_FillRectangle(0, 0, ILI9488_WIDTH, ILI9488_HEIGHT, ILI9488_BLACK);
 }
 
 void DrawMenu(const char* title, const char** options, int numOptions, int currentSelection) {
@@ -13,13 +13,13 @@ void DrawMenu(const char* title, const char** options, int numOptions, int curre
 
     // Desenha o título com a fonte maior, mais abaixo no ecrã
     sprintf(buffer, "%s", title);
-    ILI9341_WriteString(0, 0, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+    ILI9488_WriteString(0, 0, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
 
     // Desenha as opções com mais espaçamento vertical
     for (int i = 0; i < numOptions; i++) {
-        uint16_t color = (i == currentSelection) ? ILI9341_YELLOW : ILI9341_WHITE;
+        uint16_t color = (i == currentSelection) ? ILI9488_YELLOW : ILI9488_WHITE;
         sprintf(buffer, "%s %s", (i == currentSelection) ? ">" : " ", options[i]);
         // Aumenta o espaçamento entre as linhas (de 15 para 25)
-        ILI9341_WriteString(0, 30 + (i * 20), buffer, Font_7x10, color, ILI9341_BLACK);
+        ILI9488_WriteString(0, 30 + (i * 20), buffer, Font_7x10, color, ILI9488_BLACK);
     }
 }

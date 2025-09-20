@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ili9341.h"
+#include "ILI9488.h"
 #include "fonts.h"
 #include "keypad.h"
 
@@ -131,19 +131,19 @@ int main(void)
 
   // 1. Inicializa o display. Ele usará a velocidade alta do SPI configurada
   //    no MX_SPI1_Init(), o que é ótimo para performance gráfica.
-  ILI9341_Init();
+  ILI9488_Init();
 
   // 2. Acende o backlight do display.
   //    (Assumindo que seu pino é o LCD_LED_Pin, como no seu MX_GPIO_Init)
   HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_SET);
 
   // 3. Prepara a tela para o usuário com uma mensagem de boas-vindas.
-  ILI9341_FillScreen(ILI9341_BLACK);
-  ILI9341_WriteString(20, 120, "Sistema Iniciado!", Font_7x10, ILI9341_GREEN, ILI9341_BLACK);
+  ILI9488_FillScreen(ILI9488_BLACK);
+  ILI9488_WriteString(20, 120, "Sistema Iniciado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
   HAL_Delay(2000); // Uma pequena pausa para o usuário ler a mensagem.
 
   // 4. Limpa a tela para começar a desenhar.
-  ILI9341_FillScreen(ILI9341_BLACK);
+  ILI9488_FillScreen(ILI9488_BLACK);
 
   /* USER CODE END 2 */
 
@@ -653,8 +653,8 @@ void StartDisplayTask(void const * argument)
       {
           case eInitGame:
           {
-            ILI9341_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
-            ILI9341_WriteString(5, 30, "Pressione *", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            ILI9488_WriteString(5, 30, "Pressione *", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             break;
           }
           case eDificultSelect:
@@ -670,23 +670,23 @@ void StartDisplayTask(void const * argument)
           case eBattleInit:
           {
             sprintf(buffer, "Selecione o %d ataque", (u8ContAttack + 1));
-            ILI9341_WriteString(10, 15, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_WriteString(10, 15, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
 
-            uint16_t colorFogo  = (selectedOption == 0) ? ILI9341_YELLOW : ILI9341_WHITE;
-            uint16_t colorAgua  = (selectedOption == 1) ? ILI9341_YELLOW : ILI9341_WHITE;
-            uint16_t colorAr    = (selectedOption == 2) ? ILI9341_YELLOW : ILI9341_WHITE;
-            uint16_t colorTerra = (selectedOption == 3) ? ILI9341_YELLOW : ILI9341_WHITE;
+            uint16_t colorFogo  = (selectedOption == 0) ? ILI9488_YELLOW : ILI9488_WHITE;
+            uint16_t colorAgua  = (selectedOption == 1) ? ILI9488_YELLOW : ILI9488_WHITE;
+            uint16_t colorAr    = (selectedOption == 2) ? ILI9488_YELLOW : ILI9488_WHITE;
+            uint16_t colorTerra = (selectedOption == 3) ? ILI9488_YELLOW : ILI9488_WHITE;
 
-            ILI9341_FillRectangle(5, 50, 20, 20, ILI9341_RED);
-            ILI9341_WriteString(40, 55, "A - Fogo", Font_7x10, colorFogo, ILI9341_BLACK);
-            ILI9341_FillRectangle(5, 85, 20, 20, ILI9341_BLUE);
-            ILI9341_WriteString(40, 90, "B - Agua", Font_7x10, colorAgua, ILI9341_BLACK);
-            ILI9341_FillRectangle(200, 50, 25, 25, ILI9341_CYAN);
-            ILI9341_WriteString(235, 55, "C - Ar", Font_7x10, colorAr, ILI9341_BLACK);
-            ILI9341_FillRectangle(200, 85, 25, 25, ILI9341_BROWN);
-            ILI9341_WriteString(235, 90, "D - Terra", Font_7x10, colorTerra, ILI9341_BLACK);
-            ILI9341_WriteString(5, 110, "Player:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
-            ILI9341_WriteString(5, 150, "CPU:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_FillRectangle(5, 50, 20, 20, ILI9488_RED);
+            ILI9488_WriteString(40, 55, "A - Fogo", Font_7x10, colorFogo, ILI9488_BLACK);
+            ILI9488_FillRectangle(5, 85, 20, 20, ILI9488_BLUE);
+            ILI9488_WriteString(40, 90, "B - Agua", Font_7x10, colorAgua, ILI9488_BLACK);
+            ILI9488_FillRectangle(200, 50, 25, 25, ILI9488_CYAN);
+            ILI9488_WriteString(235, 55, "C - Ar", Font_7x10, colorAr, ILI9488_BLACK);
+            ILI9488_FillRectangle(200, 85, 25, 25, ILI9488_BROWN);
+            ILI9488_WriteString(235, 90, "D - Terra", Font_7x10, colorTerra, ILI9488_BLACK);
+            ILI9488_WriteString(5, 110, "Player:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            ILI9488_WriteString(5, 150, "CPU:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
 
             for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
             {
@@ -694,87 +694,87 @@ void StartDisplayTask(void const * argument)
               if (selectedDifficulty == eDificultEasy) { showAttack = TRUE; }
               else if (selectedDifficulty == eDificultMedium) { if (i == 0 || i == 2) { showAttack = TRUE; } }
               if(showAttack) {
-                uint16_t attackColor = ILI9341_WHITE;
+                uint16_t attackColor = ILI9488_WHITE;
                 switch(eCpuPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9341_RED;   break;
-                    case eBlue:   attackColor = ILI9341_BLUE;  break;
-                    case eGreen:  attackColor = ILI9341_CYAN;  break;
-                    case eYellow: attackColor = ILI9341_BROWN; break;
-                    case eWhite:  attackColor = ILI9341_WHITE; break;
-                    case eBlack:  attackColor = ILI9341_GRAY;  break;
+                    case eRed:    attackColor = ILI9488_RED;   break;
+                    case eBlue:   attackColor = ILI9488_BLUE;  break;
+                    case eGreen:  attackColor = ILI9488_CYAN;  break;
+                    case eYellow: attackColor = ILI9488_BROWN; break;
+                    case eWhite:  attackColor = ILI9488_WHITE; break;
+                    case eBlack:  attackColor = ILI9488_GRAY;  break;
                 }
-                ILI9341_FillRectangle(5 + (i * 30), 160, 20, 20, attackColor);
+                ILI9488_FillRectangle(5 + (i * 30), 160, 20, 20, attackColor);
               } else {
-                ILI9341_WriteString(5 + (i * 30), 160, "??", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+                ILI9488_WriteString(5 + (i * 30), 160, "??", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
               }
             }
             for(uint8_t i = 0; i < u8ContAttack; i++) {
-              uint16_t attackColor = ILI9341_WHITE;
+              uint16_t attackColor = ILI9488_WHITE;
               switch(eUserPlayer.eAttackSequential[i]) {
-                  case eRed:    attackColor = ILI9341_RED;   break;
-                  case eBlue:   attackColor = ILI9341_BLUE;  break;
-                  case eGreen:  attackColor = ILI9341_CYAN;  break;
-                  case eYellow: attackColor = ILI9341_BROWN; break;
-                  case eWhite:  attackColor = ILI9341_WHITE; break;
-                  case eBlack:  attackColor = ILI9341_GRAY;  break;
+                  case eRed:    attackColor = ILI9488_RED;   break;
+                  case eBlue:   attackColor = ILI9488_BLUE;  break;
+                  case eGreen:  attackColor = ILI9488_CYAN;  break;
+                  case eYellow: attackColor = ILI9488_BROWN; break;
+                  case eWhite:  attackColor = ILI9488_WHITE; break;
+                  case eBlack:  attackColor = ILI9488_GRAY;  break;
               }
-              ILI9341_FillRectangle(5 + (i * 30), 120, 20, 20, attackColor);
+              ILI9488_FillRectangle(5 + (i * 30), 120, 20, 20, attackColor);
             }
             break;
           }
           case ePlayerTurn:
           {
-            ILI9341_WriteString(10, 20, "Resultado do Round", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_WriteString(10, 20, "Resultado do Round", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             sprintf(buffer, "Sua Vida: %d", eUserPlayer.u8HeartPoints);
-            ILI9341_WriteString(10, 60, buffer, Font_7x10, ILI9341_GREEN, ILI9341_BLACK);
+            ILI9488_WriteString(10, 60, buffer, Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
             sprintf(buffer, "Vida CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9341_WriteString(10, 90, buffer, Font_7x10, ILI9341_RED, ILI9341_BLACK);
-            ILI9341_WriteString(10, 130, "Seus Ataques:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_WriteString(10, 90, buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
+            ILI9488_WriteString(10, 130, "Seus Ataques:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
-                uint16_t attackColor = ILI9341_WHITE;
+                uint16_t attackColor = ILI9488_WHITE;
                 switch(eUserPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9341_RED;   break;
-                    case eBlue:   attackColor = ILI9341_BLUE;  break;
-                    case eGreen:  attackColor = ILI9341_CYAN;  break;
-                    case eYellow: attackColor = ILI9341_BROWN; break;
-                    case eWhite:  attackColor = ILI9341_WHITE; break;
-                    case eBlack:  attackColor = ILI9341_GRAY;  break;
+                    case eRed:    attackColor = ILI9488_RED;   break;
+                    case eBlue:   attackColor = ILI9488_BLUE;  break;
+                    case eGreen:  attackColor = ILI9488_CYAN;  break;
+                    case eYellow: attackColor = ILI9488_BROWN; break;
+                    case eWhite:  attackColor = ILI9488_WHITE; break;
+                    case eBlack:  attackColor = ILI9488_GRAY;  break;
                 }
-                ILI9341_FillRectangle(10 + (i * 30), 150, 20, 20, attackColor);
+                ILI9488_FillRectangle(10 + (i * 30), 150, 20, 20, attackColor);
             }
-            ILI9341_WriteString(10, 190, "Ataques CPU:", Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_WriteString(10, 190, "Ataques CPU:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
-                uint16_t attackColor = ILI9341_WHITE;
+                uint16_t attackColor = ILI9488_WHITE;
                 switch(eCpuPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9341_RED;   break;
-                    case eBlue:   attackColor = ILI9341_BLUE;  break;
-                    case eGreen:  attackColor = ILI9341_CYAN;  break;
-                    case eYellow: attackColor = ILI9341_BROWN; break;
-                    case eWhite:  attackColor = ILI9341_WHITE; break;
-                    case eBlack:  attackColor = ILI9341_GRAY;  break;
+                    case eRed:    attackColor = ILI9488_RED;   break;
+                    case eBlue:   attackColor = ILI9488_BLUE;  break;
+                    case eGreen:  attackColor = ILI9488_CYAN;  break;
+                    case eYellow: attackColor = ILI9488_BROWN; break;
+                    case eWhite:  attackColor = ILI9488_WHITE; break;
+                    case eBlack:  attackColor = ILI9488_GRAY;  break;
                 }
-                ILI9341_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
+                ILI9488_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
             }
-            ILI9341_WriteString(10, 280, "Pressione * para continuar...", Font_7x10, ILI9341_YELLOW, ILI9341_BLACK);
+            ILI9488_WriteString(10, 280, "Pressione * para continuar...", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
             break;
           }
           case eEndGame:
           {
             if (eUserPlayer.u8HeartPoints > 0) {
-                ILI9341_WriteString(70, 80, "VITORIA!", Font_7x10, ILI9341_GREEN, ILI9341_BLACK);
+                ILI9488_WriteString(70, 80, "VITORIA!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
             } else {
-                ILI9341_WriteString(70, 80, "DERROTA!", Font_7x10, ILI9341_RED, ILI9341_BLACK);
+                ILI9488_WriteString(70, 80, "DERROTA!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
             }
             sprintf(buffer, "Sua Vida Final: %d", eUserPlayer.u8HeartPoints);
-            ILI9341_WriteString(10, 140, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
+            ILI9488_WriteString(10, 140, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             sprintf(buffer, "Vida Final CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9341_WriteString(10, 160, buffer, Font_7x10, ILI9341_WHITE, ILI9341_BLACK);
-            ILI9341_WriteString(10, 250, "Pressione * para recomecar", Font_7x10, ILI9341_YELLOW, ILI9341_BLACK);
+            ILI9488_WriteString(10, 160, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            ILI9488_WriteString(10, 250, "Pressione * para recomecar", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
             break;
           }
           default:
           {
-            ILI9341_WriteString(10, 10, "Erro de Estado!", Font_7x10, ILI9341_RED, ILI9341_BLACK);
+            ILI9488_WriteString(10, 10, "Erro de Estado!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
             break;
           }
       }

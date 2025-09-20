@@ -5,6 +5,8 @@
         "st7789.h": "c",
         "stdint.h": "c",
         "test": "c",
-        "cmsis_os.h": "c"
+        "cmsis_os.h": "c",
+        "fonts.h": "c",
+        "stdio.h": "c"
     }
 }
