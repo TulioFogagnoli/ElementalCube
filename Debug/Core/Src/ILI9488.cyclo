@@ -11,5 +11,6 @@
 ../Core/Src/ILI9488.c:147:6:ILI9488_FillRectangle	6
 ../Core/Src/ILI9488.c:176:6:ILI9488_WriteString	5
 ../Core/Src/ILI9488.c:195:6:ILI9488_FillScreen	1
-../Core/Src/ILI9488.c:199:6:ILI9488_DrawImage	1
-../Core/Src/ILI9488.c:205:6:ILI9488_InvertColors	2
+../Core/Src/ILI9488.c:199:6:ILI9488_DrawImage_RGB565	7
+../Core/Src/ILI9488.c:236:6:ILI9488_DrawImage_RGB666	6
+../Core/Src/ILI9488.c:258:6:ILI9488_InvertColors	2

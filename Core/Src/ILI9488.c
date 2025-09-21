@@ -196,10 +196,63 @@ void ILI9488_FillScreen(uint16_t color) {
     ILI9488_FillRectangle(0, 0, ILI9488_WIDTH, ILI9488_HEIGHT, color);
 }
 
-void ILI9488_DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data) {
-    // Esta função precisaria de uma conversão mais complexa para 3-byte.
-    // Por enquanto, vamos preencher com uma cor para indicar que ela foi chamada.
-    ILI9488_FillRectangle(x, y, w, h, ILI9488_MAGENTA);
+void ILI9488_DrawImage_RGB565(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data)
+{
+    if ((x >= ILI9488_WIDTH) || (y >= ILI9488_HEIGHT)) return;
+    if ((x + w - 1) >= ILI9488_WIDTH) return;
+    if ((y + h - 1) >= ILI9488_HEIGHT) return;
+
+    ILI9488_Select();
+    ILI9488_SetAddressWindow(x, y, x + w - 1, y + h - 1);
+
+    // Buffer para os dados de cor convertidos (3 bytes por pixel)
+    uint8_t buffer[w * 3]; 
+
+    for (uint16_t i = 0; i < h; i++) {
+        for (uint16_t j = 0; j < w; j++) {
+            uint16_t color = data[i * w + j];
+            
+            // Converte a cor RGB565 para RGB666
+            uint8_t r = (color >> 11) & 0x1F;
+            uint8_t g = (color >> 5) & 0x3F;
+            uint8_t b = color & 0x1F;
+            
+            r = (r << 3) | (r >> 2);
+            g = (g << 2) | (g >> 4);
+            b = (b << 3) | (b >> 2);
+            
+            // Armazena no buffer
+            buffer[j * 3] = r;
+            buffer[j * 3 + 1] = g;
+            buffer[j * 3 + 2] = b;
+        }
+        // Envia uma linha inteira de uma vez
+        ILI9488_WriteData(buffer, w * 3);
+    }
+
+    ILI9488_Unselect();
+}
+
+void ILI9488_DrawImage_RGB666(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t* data) {
+    if ((x >= ILI9488_WIDTH) || (y >= ILI9488_HEIGHT)) return;
+    if ((x + w - 1) >= ILI9488_WIDTH) return;
+    if ((y + h - 1) >= ILI9488_HEIGHT) return;
+
+    ILI9488_Select();
+    ILI9488_SetAddressWindow(x, y, x + w - 1, y + h - 1);
+    
+    // Calcula o tamanho de uma linha da imagem em bytes (largura * 3 bytes por pixel)
+    uint32_t line_size_bytes = (uint32_t)w * 3;
+    
+    // Envia os dados da imagem linha por linha
+    for (uint16_t i = 0; i < h; i++) {
+        // Calcula o ponteiro para o início da linha atual
+        const uint8_t* p_line_data = data + (i * line_size_bytes);
+        // Envia a linha inteira para o display
+        ILI9488_WriteData((uint8_t*)p_line_data, line_size_bytes);
+    }
+    
+    ILI9488_Unselect();
 }
 
 void ILI9488_InvertColors(bool invert) {

@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "ILI9488.h"
 #include "TCS3472.h"
+#include "Logo300.h"
 
 #include "fonts.h"
 #include "keypad.h"
@@ -705,13 +706,13 @@ void StartDisplayTask(void const * argument)
       {
           case eInitGame:
           {
-            ILI9488_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            ILI9488_WriteString(5, 30, "Pressione *", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-
-            sprintf(buffer, "R:%04u G:%04u", colorData.red, colorData.green);
-            ILI9488_WriteString(10, 200, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            sprintf(buffer, "B:%04u C:%04u", colorData.blue, colorData.clear);
-            ILI9488_WriteString(10, 220, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            // ILI9488_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            // ILI9488_WriteString(5, 30, "Pressione *", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            ILI9488_DrawImage_RGB666(100, 10, Logo300_map.width, Logo300_map.height, Logo300_map.pixel_data);
+            // sprintf(buffer, "R:%04u G:%04u", colorData.red, colorData.green);
+            // ILI9488_WriteString(10, 200, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            // sprintf(buffer, "B:%04u C:%04u", colorData.blue, colorData.clear);
+            // ILI9488_WriteString(10, 220, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             break;
           }
           case eDificultSelect:
