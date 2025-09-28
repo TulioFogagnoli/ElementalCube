@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include <stdbool.h>
+#include "game_types.h"
 
 // Endereço I2C fixo do sensor
 #define TCS3472_ADDRESS (0x29 << 1) // Usamos (0x29 << 1) porque a HAL usa endereços de 8 bits
@@ -16,7 +17,7 @@ typedef struct {
 } TCS3472_Data;
 
 // Funções do driver
-bool TCS3472_Init(I2C_HandleTypeDef *hi2c);
-void TCS3472_ReadData(I2C_HandleTypeDef *hi2c, TCS3472_Data* color_data);
-
+bool TCS3472_Init(I2C_HandleTypeDef *hi2c, uint8_t channel);
+void TCS3472_ReadData(I2C_HandleTypeDef *hi2c, uint8_t channel, TCS3472_Data* color_data);
+EColor TCS3472_DetectColor(TCS3472_Data data);
 #endif // __TCS3472_H__

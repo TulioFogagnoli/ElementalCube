@@ -24,6 +24,8 @@
 /* USER CODE BEGIN Includes */
 #include "ILI9488.h"
 #include "TCS3472.h"
+#include "TCA9548A.h"
+
 #include "Logo300.h"
 
 #include "fonts.h"
@@ -70,7 +72,7 @@ volatile uint8_t u8CleanScreen = TRUE;
 volatile EDificult selectedDifficulty;
 volatile EWizard eUserPlayer;
 volatile EWizard eCpuPlayer;
-volatile TCS3472_Data colorData;
+volatile TCS3472_Data colorData[4];
 volatile uint8_t u8ContAttack = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
@@ -144,15 +146,42 @@ int main(void)
 
   // 3. Prepara a tela para o usuário com uma mensagem de boas-vindas.
   ILI9488_FillScreen(ILI9488_BLACK);
-  if (TCS3472_Init(&hi2c1))
+  
+  char buffer[40];
+
+  // 1. Verifica se o multiplexador TCA9548A está respondendo
+  ILI9488_WriteString(10, 30, "Verificando MUX...", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+  if (HAL_I2C_IsDeviceReady(&hi2c1, MUX_ADDR, 2, 100) == HAL_OK)
   {
-    // Sucesso! Mostra uma mensagem no display
-    ILI9488_WriteString(10, 200, "Sensor de Cor OK!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+    ILI9488_WriteString(10, 50, "Multiplexador OK!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
   }
   else
   {
-    // Falha! Mostra uma mensagem de erro
-    ILI9488_WriteString(10, 200, "Erro no Sensor de Cor!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+    ILI9488_WriteString(10, 50, "Falha no Multiplexador!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+    // Trava aqui se o MUX falhar, pois nada mais vai funcionar
+    while (1);
+  }
+  HAL_Delay(1000);
+
+
+  // 2. Inicializa e verifica cada um dos 4 sensores de cor
+  for (int i = 0; i < 4; i++)
+  {
+    sprintf(buffer, "Iniciando Sensor %d...", i + 1);
+    ILI9488_WriteString(10, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+    HAL_Delay(100);
+
+    if (TCS3472_Init(&hi2c1, i))
+    {
+      sprintf(buffer, "Sensor de Cor %d OK!", i + 1);
+      ILI9488_WriteString(10, 95 + (i * 30), buffer, Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+    }
+    else
+    {
+      sprintf(buffer, "Erro no Sensor de Cor %d!", i + 1);
+      ILI9488_WriteString(10, 95 + (i * 30), buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
+    }
+    HAL_Delay(250); // Aumenta o tempo para podermos ler
   }
 
   ILI9488_WriteString(20, 120, "Sistema Iniciado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
@@ -450,7 +479,9 @@ void StartInputHalTask(void const * argument)
     {
       keyPressed = cCurrent;
     }
-    TCS3472_ReadData(&hi2c1, &colorData);
+    for (int i = 0; i < 4; i++) {
+        TCS3472_ReadData(&hi2c1, i, &colorData[i]);
+    }
     osDelay(50);
   }
 }
@@ -573,53 +604,23 @@ void StartGameTask(void const * argument)
         }
         case eBattleInit:
         {
+          // A lógica de ataque agora só depende das teclas CONFIRM e BACK
           switch (cLocalKeyPressed)
           {
-            case FIRE_KEY:
-            {
-              selectedOption = 0;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case WATER_KEY:
-            {
-              selectedOption = 1;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case AIR_KEY: 
-            {
-              selectedOption = 2;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case EARTH_KEY: 
-            {
-              selectedOption = 3;
-              u8CleanScreen = TRUE;
-              break;
-            }
             case CONFIRM_KEY:
             {
-              switch(selectedOption)
+              // Lê a cor de cada um dos 4 sensores e define a sequência de ataque
+              for (int i = 0; i < ATTACKS_NUMBERS; i++)
               {
-                  case 0: eUserPlayer.eAttackSequential[u8ContAttack] = eRed;    break;
-                  case 1: eUserPlayer.eAttackSequential[u8ContAttack] = eBlue;   break;
-                  case 2: eUserPlayer.eAttackSequential[u8ContAttack] = eGreen;  break;
-                  case 3: eUserPlayer.eAttackSequential[u8ContAttack] = eYellow; break;
+                  eUserPlayer.eAttackSequential[i] = TCS3472_DetectColor(colorData[i]);
               }
-              
-              u8ContAttack++; 
-              
-              if (u8ContAttack >= ATTACKS_NUMBERS)
-              {
-                vInitBattle(&eUserPlayer, &eCpuPlayer);
-                eCurrentState = ePlayerTurn;
-              }
-              
+
+              // Prepara e inicia a batalha
+              vInitBattle(&eUserPlayer, &eCpuPlayer);
+              eCurrentState = ePlayerTurn;
               u8CleanScreen = TRUE;
               break;
-            }
+            } 
             case BACK_KEY:
             {
               eCurrentState = ePersonaSelect;
@@ -627,9 +628,8 @@ void StartGameTask(void const * argument)
               break;
             }
             default:
-            {
+              // Ignora outras teclas, pois a tela se atualiza sozinha
               break;
-            }
           }
           break;
         }
@@ -687,32 +687,24 @@ void StartDisplayTask(void const * argument)
   /* USER CODE BEGIN StartDisplayTask */
   char buffer[30];
   uint8_t u8RedrawScreen = FALSE;
+  EGameStates ePreviousState = eInitGame;
   for(;;)
   {
     osMutexWait(gameMutexHandle, osWaitForever);
-    if (TRUE == u8CleanScreen) {
-        u8RedrawScreen = TRUE;
-        u8CleanScreen = FALSE;
-    }
+    EGameStates eLocalCurrentState = eCurrentState;
     osMutexRelease(gameMutexHandle);
 
 
 
-    if(TRUE == u8RedrawScreen)
+    if(eLocalCurrentState != ePreviousState)
     {
       ClearScreen();
 
-      switch(eCurrentState)
+      switch(eLocalCurrentState)
       {
           case eInitGame:
           {
-            // ILI9488_WriteString(5, 10, "ElementalCube!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            // ILI9488_WriteString(5, 30, "Pressione *", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             ILI9488_DrawImage_RGB666(100, 10, Logo300_map.width, Logo300_map.height, Logo300_map.pixel_data);
-            // sprintf(buffer, "R:%04u G:%04u", colorData.red, colorData.green);
-            // ILI9488_WriteString(10, 200, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            // sprintf(buffer, "B:%04u C:%04u", colorData.blue, colorData.clear);
-            // ILI9488_WriteString(10, 220, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
             break;
           }
           case eDificultSelect:
@@ -727,57 +719,12 @@ void StartDisplayTask(void const * argument)
           }
           case eBattleInit:
           {
-            sprintf(buffer, "Selecione o %d ataque", (u8ContAttack + 1));
-            ILI9488_WriteString(10, 15, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-
-            uint16_t colorFogo  = (selectedOption == 0) ? ILI9488_YELLOW : ILI9488_WHITE;
-            uint16_t colorAgua  = (selectedOption == 1) ? ILI9488_YELLOW : ILI9488_WHITE;
-            uint16_t colorAr    = (selectedOption == 2) ? ILI9488_YELLOW : ILI9488_WHITE;
-            uint16_t colorTerra = (selectedOption == 3) ? ILI9488_YELLOW : ILI9488_WHITE;
-
-            ILI9488_FillRectangle(5, 50, 20, 20, ILI9488_RED);
-            ILI9488_WriteString(40, 55, "A - Fogo", Font_7x10, colorFogo, ILI9488_BLACK);
-            ILI9488_FillRectangle(5, 85, 20, 20, ILI9488_BLUE);
-            ILI9488_WriteString(40, 90, "B - Agua", Font_7x10, colorAgua, ILI9488_BLACK);
-            ILI9488_FillRectangle(200, 50, 25, 25, ILI9488_CYAN);
-            ILI9488_WriteString(235, 55, "C - Ar", Font_7x10, colorAr, ILI9488_BLACK);
-            ILI9488_FillRectangle(200, 85, 25, 25, ILI9488_BROWN);
-            ILI9488_WriteString(235, 90, "D - Terra", Font_7x10, colorTerra, ILI9488_BLACK);
-            ILI9488_WriteString(5, 110, "Player:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            ILI9488_WriteString(5, 150, "CPU:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++)
-            {
-              uint8_t showAttack = FALSE;
-              if (selectedDifficulty == eDificultEasy) { showAttack = TRUE; }
-              else if (selectedDifficulty == eDificultMedium) { if (i == 0 || i == 2) { showAttack = TRUE; } }
-              if(showAttack) {
-                uint16_t attackColor = ILI9488_WHITE;
-                switch(eCpuPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9488_RED;   break;
-                    case eBlue:   attackColor = ILI9488_BLUE;  break;
-                    case eGreen:  attackColor = ILI9488_CYAN;  break;
-                    case eYellow: attackColor = ILI9488_BROWN; break;
-                    case eWhite:  attackColor = ILI9488_WHITE; break;
-                    case eBlack:  attackColor = ILI9488_GRAY;  break;
-                }
-                ILI9488_FillRectangle(5 + (i * 30), 160, 20, 20, attackColor);
-              } else {
-                ILI9488_WriteString(5 + (i * 30), 160, "??", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            ILI9488_WriteString(10, 15, "Prepare seus ataques!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            ILI9488_WriteString(10, 35, "Posicione os 4 cubos e pressione *", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
+            for (int i = 0; i < 4; i++) {
+              sprintf(buffer, "Sensor %d:", i + 1);
+              ILI9488_WriteString(20, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
               }
-            }
-            for(uint8_t i = 0; i < u8ContAttack; i++) {
-              uint16_t attackColor = ILI9488_WHITE;
-              switch(eUserPlayer.eAttackSequential[i]) {
-                  case eRed:    attackColor = ILI9488_RED;   break;
-                  case eBlue:   attackColor = ILI9488_BLUE;  break;
-                  case eGreen:  attackColor = ILI9488_CYAN;  break;
-                  case eYellow: attackColor = ILI9488_BROWN; break;
-                  case eWhite:  attackColor = ILI9488_WHITE; break;
-                  case eBlack:  attackColor = ILI9488_GRAY;  break;
-              }
-              ILI9488_FillRectangle(5 + (i * 30), 120, 20, 20, attackColor);
-            }
             break;
           }
           case ePlayerTurn:
@@ -836,9 +783,35 @@ void StartDisplayTask(void const * argument)
             break;
           }
       }
-      u8RedrawScreen = FALSE;
+      ePreviousState = eLocalCurrentState;    
     }
-    osDelay(5);
+
+    if (eLocalCurrentState == eBattleInit)
+    {
+        for (int i = 0; i < 4; i++) {
+            EColor detectedColor = TCS3472_DetectColor(colorData[i]);
+            uint16_t colorBox = ILI9488_BLACK;
+            char colorName[10] = "Vazio";
+
+            switch(detectedColor) {
+                case eRed:    colorBox = ILI9488_RED;   strcpy(colorName, "Fogo");   break;
+                case eBlue:   colorBox = ILI9488_BLUE;  strcpy(colorName, "Agua");   break;
+                case eGreen:  colorBox = ILI9488_CYAN;  strcpy(colorName, "Ar");     break;
+                case eYellow: colorBox = ILI9488_BROWN; strcpy(colorName, "Terra");  break;
+                case eWhite:  colorBox = ILI9488_WHITE; strcpy(colorName, "Luz?");   break;
+                default: break;
+            }
+
+            // APAGA a área do nome da cor antiga desenhando um retângulo preto por cima
+            ILI9488_FillRectangle(100, 80 + (i * 30), 45, 10, ILI9488_BLACK);
+            // Escreve o novo nome da cor
+            ILI9488_WriteString(100, 80 + (i * 30), colorName, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+            // Redesenha o quadrado colorido
+            ILI9488_FillRectangle(150, 75 + (i * 30), 20, 20, colorBox);
+        }
+    }
+
+    HAL_Delay(10);
   }
   /* USER CODE END StartDisplayTask */
 }
