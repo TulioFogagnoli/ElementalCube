@@ -27,7 +27,6 @@
 #include "TCA9548A.h"
 
 #include "Logo300.h"
-#include "background.h"
 
 #include "fonts.h"
 #include "keypad.h"
@@ -710,8 +709,6 @@ void StartDisplayTask(void const * argument)
           }
           case eDificultSelect:
           {
-            ILI9488_DrawImage_RGB666(0, 0, background_map.width, background_map.height, background_map.pixel_data);
-            
             DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
             break;
           }
