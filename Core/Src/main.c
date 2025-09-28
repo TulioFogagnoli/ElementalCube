@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -56,7 +57,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
+SD_HandleTypeDef hsd;
 SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart4;
 
@@ -85,7 +87,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_UART4_Init(void);
-static void MX_I2C1_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_SDIO_SD_Init(void);
 void StartInputHalTask(void const * argument);
 void StartGameTask(void const * argument);
 void StartDisplayTask(void const * argument);
@@ -127,9 +130,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_SPI1_Init();
   MX_UART4_Init();
-  MX_I2C1_Init();
+  MX_SPI1_Init();
+  MX_I2C2_Init();
+  MX_SDIO_SD_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
   //--------------------------------------------------------------------
@@ -151,7 +156,7 @@ int main(void)
 
   // 1. Verifica se o multiplexador TCA9548A está respondendo
   ILI9488_WriteString(10, 30, "Verificando MUX...", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-  if (HAL_I2C_IsDeviceReady(&hi2c1, MUX_ADDR, 2, 100) == HAL_OK)
+  if (HAL_I2C_IsDeviceReady(&hi2c2, MUX_ADDR, 2, 100) == HAL_OK)
   {
     ILI9488_WriteString(10, 50, "Multiplexador OK!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
   }
@@ -171,7 +176,7 @@ int main(void)
     ILI9488_WriteString(10, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
     HAL_Delay(100);
 
-    if (TCS3472_Init(&hi2c1, i))
+    if (TCS3472_Init(&hi2c2, i))
     {
       sprintf(buffer, "Sensor de Cor %d OK!", i + 1);
       ILI9488_WriteString(10, 95 + (i * 30), buffer, Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
@@ -268,7 +273,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -290,36 +295,64 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
+  * @brief I2C2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_I2C1_Init(void)
+static void MX_I2C2_Init(void)
 {
 
-  /* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN I2C2_Init 0 */
 
-  /* USER CODE END I2C1_Init 0 */
+  /* USER CODE END I2C2_Init 0 */
 
-  /* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN I2C2_Init 1 */
 
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE BEGIN I2C2_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
+  * @brief SDIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SDIO_SD_Init(void)
+{
+
+  /* USER CODE BEGIN SDIO_Init 0 */
+
+  /* USER CODE END SDIO_Init 0 */
+
+  /* USER CODE BEGIN SDIO_Init 1 */
+
+  /* USER CODE END SDIO_Init 1 */
+  hsd.Instance = SDIO;
+  hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
+  hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
+  hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
+  hsd.Init.BusWide = SDIO_BUS_WIDE_4B;
+  hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
+  hsd.Init.ClockDiv = 0;
+  /* USER CODE BEGIN SDIO_Init 2 */
+
+  /* USER CODE END SDIO_Init 2 */
 
 }
 
@@ -416,13 +449,13 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LCD_RST_Pin|LCD_DC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, LCD_RST_Pin|LCD_DC_Pin|C3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, C1_Pin|C2_Pin|C3_Pin|C4_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, C1_Pin|C2_Pin|C4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LCD_CS_Pin */
   GPIO_InitStruct.Pin = LCD_CS_Pin;
@@ -431,8 +464,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LCD_RST_Pin LCD_DC_Pin */
-  GPIO_InitStruct.Pin = LCD_RST_Pin|LCD_DC_Pin;
+  /*Configure GPIO pins : LCD_RST_Pin LCD_DC_Pin C3_Pin */
+  GPIO_InitStruct.Pin = LCD_RST_Pin|LCD_DC_Pin|C3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -445,8 +478,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : C1_Pin C2_Pin C3_Pin C4_Pin */
-  GPIO_InitStruct.Pin = C1_Pin|C2_Pin|C3_Pin|C4_Pin;
+  /*Configure GPIO pins : C1_Pin C2_Pin C4_Pin */
+  GPIO_InitStruct.Pin = C1_Pin|C2_Pin|C4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -480,7 +513,7 @@ void StartInputHalTask(void const * argument)
       keyPressed = cCurrent;
     }
     for (int i = 0; i < 4; i++) {
-        TCS3472_ReadData(&hi2c1, i, &colorData[i]);
+        TCS3472_ReadData(&hi2c2, i, &colorData[i]);
     }
     osDelay(50);
   }
@@ -514,7 +547,7 @@ void StartGameTask(void const * argument)
             eCurrentState = eDificultSelect;
             selectedOption = 0;
             u8CleanScreen = TRUE;
-            }
+  }
           break;
         }
         case eDificultSelect:
@@ -787,7 +820,7 @@ void StartDisplayTask(void const * argument)
     }
 
     if (eLocalCurrentState == eBattleInit)
-    {
+  {
         for (int i = 0; i < 4; i++) {
             EColor detectedColor = TCS3472_DetectColor(colorData[i]);
             uint16_t colorBox = ILI9488_BLACK;
@@ -817,6 +850,28 @@ void StartDisplayTask(void const * argument)
 }
 
 /**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+
+/**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
@@ -830,7 +885,8 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-#ifdef USE_FULL_ASSERT
+
+#ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
