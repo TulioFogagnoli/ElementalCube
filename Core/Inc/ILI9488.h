@@ -57,5 +57,5 @@ void ILI9488_FillScreen(uint16_t color);
 void ILI9488_DrawImage_RGB565(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data);
 void ILI9488_DrawImage_RGB666(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t* data);
 void ILI9488_InvertColors(bool invert);
-
+uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath);
 #endif // __ILI9488_H__

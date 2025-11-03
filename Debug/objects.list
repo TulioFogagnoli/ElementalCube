@@ -1,5 +1,4 @@
 "./Core/Src/ILI9488.o"
-"./Core/Src/Logo300.o"
 "./Core/Src/TCA9548A.o"
 "./Core/Src/TCS3472.o"
 "./Core/Src/fonts.o"

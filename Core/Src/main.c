@@ -27,7 +27,6 @@
 #include "TCS3472.h"
 #include "TCA9548A.h"
 
-#include "Logo300.h"
 
 #include "fonts.h"
 #include "keypad.h"
@@ -53,7 +52,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+FATFS mSDFatFS;
+extern char SDPath[4];
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -61,6 +61,8 @@ I2C_HandleTypeDef hi2c2;
 SD_HandleTypeDef hsd;
 SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart4;
+DMA_HandleTypeDef hdma_sdio_rx;
+DMA_HandleTypeDef hdma_sdio_tx;
 
 osThreadId inputHalTaskHandle;
 osThreadId gameTaskHandle;
@@ -76,6 +78,7 @@ volatile EWizard eUserPlayer;
 volatile EWizard eCpuPlayer;
 volatile TCS3472_Data colorData[4];
 volatile uint8_t u8ContAttack = 0;
+volatile uint8_t sdCardMounted = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
 /* USER CODE BEGIN PV */
@@ -85,10 +88,11 @@ const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agu
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
+static void MX_SDIO_SD_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_UART4_Init(void);
 static void MX_I2C2_Init(void);
-static void MX_SDIO_SD_Init(void);
 void StartInputHalTask(void const * argument);
 void StartGameTask(void const * argument);
 void StartDisplayTask(void const * argument);
@@ -130,10 +134,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_UART4_Init();
-  MX_SPI1_Init();
+  MX_DMA_Init();
   MX_I2C2_Init();
   MX_SDIO_SD_Init();
+  MX_SPI1_Init();
+  MX_UART4_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
@@ -166,15 +171,12 @@ int main(void)
     // Trava aqui se o MUX falhar, pois nada mais vai funcionar
     while (1);
   }
-  HAL_Delay(1000);
-
 
   // 2. Inicializa e verifica cada um dos 4 sensores de cor
   for (int i = 0; i < 4; i++)
   {
     sprintf(buffer, "Iniciando Sensor %d...", i + 1);
     ILI9488_WriteString(10, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-    HAL_Delay(100);
 
     if (TCS3472_Init(&hi2c2, i))
     {
@@ -189,7 +191,7 @@ int main(void)
     HAL_Delay(250); // Aumenta o tempo para podermos ler
   }
 
-  ILI9488_WriteString(20, 120, "Sistema Iniciado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+  ILI9488_WriteString(20, 280, "Sistema Iniciado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
   HAL_Delay(2000); // Uma pequena pausa para o usuário ler a mensagem.
 
   // 4. Limpa a tela para começar a desenhar.
@@ -265,12 +267,11 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 4;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 7;
@@ -347,9 +348,9 @@ static void MX_SDIO_SD_Init(void)
   hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
   hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
   hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
-  hsd.Init.BusWide = SDIO_BUS_WIDE_4B;
-  hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd.Init.ClockDiv = 0;
+  hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
+  hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_ENABLE;
+  hsd.Init.ClockDiv = 2;
   /* USER CODE BEGIN SDIO_Init 2 */
 
   /* USER CODE END SDIO_Init 2 */
@@ -424,6 +425,25 @@ static void MX_UART4_Init(void)
   /* USER CODE BEGIN UART4_Init 2 */
 
   /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+  /* DMA2_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
 
 }
 
@@ -721,6 +741,34 @@ void StartDisplayTask(void const * argument)
   char buffer[30];
   uint8_t u8RedrawScreen = FALSE;
   EGameStates ePreviousState = eInitGame;
+
+  FRESULT fres;
+
+  // Damos um pequeno delay para garantir que tudo estabilizou
+  osDelay(500); 
+
+  // Tenta montar o SD (o "1" significa montar imediatamente)
+  fres = f_mount(&SDFatFS, (TCHAR const*)SDPath, 1);
+  
+  if (fres == FR_OK)
+  {
+      // Sucesso!
+      sdCardMounted = 1; 
+      ILI9488_WriteString(10, 10, "Cartao SD Montado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+  }
+  else
+  {
+      // Falha!
+      sdCardMounted = 0;
+      sprintf(buffer, "Falha SD: %d", (int)fres); // Exibe o código de erro
+      ILI9488_WriteString(10, 10, buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
+      
+      if (fres == FR_NOT_READY) {
+          ILI9488_WriteString(10, 25, "FR_NOT_READY", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+      }
+  }
+  osDelay(2000); // Pausa para lermos a mensagem
+
   for(;;)
   {
     osMutexWait(gameMutexHandle, osWaitForever);
@@ -737,7 +785,15 @@ void StartDisplayTask(void const * argument)
       {
           case eInitGame:
           {
-            ILI9488_DrawImage_RGB666(100, 10, Logo300_map.width, Logo300_map.height, Logo300_map.pixel_data);
+            if (sdCardMounted) {
+                // Tenta ler do SD
+                if (!ILI9488_DrawImage_BIN(10, 10, 300, 300, "0:/logo.bin")) {
+                    ILI9488_WriteString(0, 400, "Falha ao ler logo.bin", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+                }
+            } else {
+                // Fallback: Se o SD falhou, usa a imagem da flash
+                ILI9488_WriteString(0, 400, "SD Falhou. Lendo flash.", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+            }
             break;
           }
           case eDificultSelect:

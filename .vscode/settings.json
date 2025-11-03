@@ -8,6 +8,8 @@
         "cmsis_os.h": "c",
         "fonts.h": "c",
         "stdio.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "logo300.h": "c",
+        "stdlib.h": "c"
     }
 }

@@ -57,9 +57,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/sd_diskio.h \
  ../Core/Inc/ILI9488.h ../Core/Inc/fonts.h ../Core/Inc/main.h \
  ../Core/Inc/TCS3472.h ../Core/Inc/game_types.h ../Core/Inc/TCA9548A.h \
- ../Core/Inc/Logo300.h ../Core/Inc/fonts.h ../Core/Inc/keypad.h \
- ../Core/Inc/game_fsm.h ../Core/Inc/game_types.h \
- ../Core/Inc/game_screen.h
+ ../Core/Inc/fonts.h ../Core/Inc/keypad.h ../Core/Inc/game_fsm.h \
+ ../Core/Inc/game_types.h ../Core/Inc/game_screen.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -126,7 +125,6 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/TCS3472.h:
 ../Core/Inc/game_types.h:
 ../Core/Inc/TCA9548A.h:
-../Core/Inc/Logo300.h:
 ../Core/Inc/fonts.h:
 ../Core/Inc/keypad.h:
 ../Core/Inc/game_fsm.h:

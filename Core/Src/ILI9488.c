@@ -2,6 +2,10 @@
 #include "stm32f4xx_hal.h"
 #include "ili9488.h"
 
+#include "ff.h"      // Funções principais do FatFs (f_open, f_read, etc.)
+#include "fatfs.h"   // Para definições do FatFs (opcional se ff.h já incluir)
+#include <stdlib.h>
+
 // Funções estáticas (privadas para este arquivo)
 static void ILI9488_Select() {
     HAL_GPIO_WritePin(ILI9488_CS_GPIO_Port, ILI9488_CS_Pin, GPIO_PIN_RESET);
@@ -259,4 +263,74 @@ void ILI9488_InvertColors(bool invert) {
     ILI9488_Select();
     ILI9488_WriteCommand(invert ? 0x21 : 0x20); // INVON or INVOFF
     ILI9488_Unselect();
+}
+
+/**
+  * @brief  Desenha uma imagem .bin (RGB666) lida do cartão SD.
+  * @param  x: Posição X inicial.
+  * @param  y: Posição Y inicial.
+  * @param  w: Largura da imagem.
+  * @param  h: Altura da imagem.
+  * @param  filepath: Caminho completo para o arquivo .bin no SD (ex: "0:/imagem.bin").
+  * @note   O arquivo .bin DEVE conter dados brutos de pixel no formato RGB666 (3 bytes por pixel).
+  * @note   Esta função aloca um buffer de linha no heap (malloc).
+  * @retval 1 em sucesso, 0 em falha (falha ao abrir, ler ou alocar memória).
+  */
+uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath) {
+    FIL file;
+    FRESULT res;
+    UINT br = 0; // Bytes lidos
+
+    // 1. Verifica limites da tela
+    if ((x >= ILI9488_WIDTH) || (y >= ILI9488_HEIGHT)) return 0;
+    if ((x + w - 1) >= ILI9488_WIDTH) w = ILI9488_WIDTH - x;
+    if ((y + h - 1) >= ILI9488_HEIGHT) h = ILI9488_HEIGHT - y;
+
+    // 2. Calcula o tamanho de uma linha em bytes (formato RGB666 = 3 bytes/pixel)
+    uint32_t line_size_bytes = (uint32_t)w * 3;
+
+    // 3. Aloca memória para um buffer de linha
+    //    Usar heap (malloc) é mais seguro para buffers grandes do que a stack
+    uint8_t* line_buffer = (uint8_t*)malloc(line_size_bytes);
+    if (line_buffer == NULL) {
+        return 0; // Falha ao alocar memória
+    }
+
+    // 4. Abre o arquivo de imagem
+    res = f_open(&file, filepath, FA_READ);
+    if (res != FR_OK) {
+        free(line_buffer);
+        return 0; // Falha ao abrir o arquivo
+    }
+
+    // 5. Prepara o display para receber os dados
+    ILI9488_Select();
+    ILI9488_SetAddressWindow(x, y, x + w - 1, y + h - 1);
+
+    // 6. Loop para ler linha por linha do SD e enviar para o display
+    for (uint16_t i = 0; i < h; i++) {
+        // Lê uma linha inteira do arquivo para o buffer
+        res = f_read(&file, line_buffer, line_size_bytes, &br);
+
+        // Se a leitura falhar ou não ler a quantidade esperada de bytes, para.
+        if (res != FR_OK || br != line_size_bytes) {
+            break; 
+        }
+
+        // Envia os dados da linha para o display
+        // ILI9488_WriteData cuida de setar o pino DC e transmitir via SPI
+        ILI9488_WriteData(line_buffer, line_size_bytes);
+    }
+
+    // 7. Limpeza
+    ILI9488_Unselect();
+    f_close(&file);
+    free(line_buffer);
+
+    // Se br (bytes lidos na última tentativa) for 0 e h > 0, algo falhou
+    if (br == 0 && h > 0) {
+        return 0; // Leitura falhou antes de terminar
+    }
+
+    return 1; // Sucesso
 }
