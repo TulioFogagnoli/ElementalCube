@@ -1,5 +1,5 @@
 #include "TCS3472.h"
-
+#include "TCA9548A.h"
 // Registos do sensor
 #define TCS3472_COMMAND_BIT      0x80
 #define TCS3472_REG_ENABLE       0x00

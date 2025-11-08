@@ -23,21 +23,16 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>    
+#include <string.h>   
+#include "game_types.h"
 #include "ILI9488.h"
 #include "TCS3472.h"
 #include "TCA9548A.h"
 
-
-#include "fonts.h"
-#include "keypad.h"
-
-#include "game_fsm.h"
-#include "game_types.h"
-#include "game_screen.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "input_task.h"
+#include "game_task.h"
+#include "display_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,8 +47,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-FATFS mSDFatFS;
-extern char SDPath[4];
+FATFS mSDFatFS;       
+extern char SDPath[4]; 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,24 +59,15 @@ UART_HandleTypeDef huart4;
 DMA_HandleTypeDef hdma_sdio_rx;
 DMA_HandleTypeDef hdma_sdio_tx;
 
-osThreadId inputHalTaskHandle;
-osThreadId gameTaskHandle;
-osThreadId displayTaskHandle; 
-osMutexId gameMutexHandle;   
-
-volatile char keyPressed = '\0';
-volatile EGameStates eCurrentState = eInitGame;
-volatile int selectedOption = 0;
-volatile uint8_t u8CleanScreen = TRUE;
-volatile EDificult selectedDifficulty;
-volatile EWizard eUserPlayer;
-volatile EWizard eCpuPlayer;
-volatile TCS3472_Data colorData[4];
-volatile uint8_t u8ContAttack = 0;
-volatile uint8_t sdCardMounted = 0;
-const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
-const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
 /* USER CODE BEGIN PV */
+
+osMessageQId g_inputQueueHandle;
+osMessageQId g_displayQueueHandle;
+osPoolId     g_inputPoolHandle;
+osPoolId     g_displayPoolHandle;
+osMutexId    g_sensorDataMutexHandle;
+volatile TCS3472_Data g_vColorData[4];
+
 
 /* USER CODE END PV */
 
@@ -93,11 +79,7 @@ static void MX_SDIO_SD_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_UART4_Init(void);
 static void MX_I2C2_Init(void);
-void StartInputHalTask(void const * argument);
-void StartGameTask(void const * argument);
-void StartDisplayTask(void const * argument);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -111,55 +93,29 @@ void StartDisplayTask(void const * argument);
   */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  /* 1. Inicialização do MCU e Periféricos HAL */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_I2C2_Init();
   MX_SDIO_SD_Init();
   MX_SPI1_Init();
   MX_UART4_Init();
-  MX_FATFS_Init();
-  /* USER CODE BEGIN 2 */
-
-  //--------------------------------------------------------------------
-  // ETAPA DE INICIALIZAÇÃO
-  //--------------------------------------------------------------------
-
-  // 1. Inicializa o display. Ele usará a velocidade alta do SPI configurada
-  //    no MX_SPI1_Init(), o que é ótimo para performance gráfica.
-  ILI9488_Init();
-
-  // 2. Acende o backlight do display.
-  //    (Assumindo que seu pino é o LCD_LED_Pin, como no seu MX_GPIO_Init)
-  HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_SET);
-
-  // 3. Prepara a tela para o usuário com uma mensagem de boas-vindas.
-  ILI9488_FillScreen(ILI9488_BLACK);
+  MX_FATFS_Init(); 
   
+  /* 2. (RESTAURADO) Inicialização da APLICAÇÃO (Display, MUX, Sensores, SD) */
+  /* Fazemos isso aqui, ANTES do scheduler, para evitar todos os conflitos */
+  
+  uint8_t localSdMounted = 0; // Variável local para o status do SD
   char buffer[40];
 
-  // 1. Verifica se o multiplexador TCA9548A está respondendo
+  // 2.1. Inicializa o display
+  ILI9488_Init();
+  HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_SET);
+  ILI9488_FillScreen(ILI9488_BLACK);
+
+  // 2.2. Verifica o MUX
   ILI9488_WriteString(10, 30, "Verificando MUX...", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
   if (HAL_I2C_IsDeviceReady(&hi2c2, MUX_ADDR, 2, 100) == HAL_OK)
   {
@@ -168,86 +124,83 @@ int main(void)
   else
   {
     ILI9488_WriteString(10, 50, "Falha no Multiplexador!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-    // Trava aqui se o MUX falhar, pois nada mais vai funcionar
-    while (1);
+    while (1); // Trava aqui (como no original)
   }
 
-  // 2. Inicializa e verifica cada um dos 4 sensores de cor
+  // 2.3. Inicializa Sensores
   for (int i = 0; i < 4; i++)
   {
     sprintf(buffer, "Iniciando Sensor %d...", i + 1);
     ILI9488_WriteString(10, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-
-    if (TCS3472_Init(&hi2c2, i))
-    {
-      sprintf(buffer, "Sensor de Cor %d OK!", i + 1);
-      ILI9488_WriteString(10, 95 + (i * 30), buffer, Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-    }
-    else
+    if (!TCS3472_Init(&hi2c2, i))
     {
       sprintf(buffer, "Erro no Sensor de Cor %d!", i + 1);
       ILI9488_WriteString(10, 95 + (i * 30), buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
     }
-    HAL_Delay(250); // Aumenta o tempo para podermos ler
+    HAL_Delay(250); // HAL_Delay funciona aqui pois o scheduler não começou
   }
+  
+  // 2.4. Monta o SD Card
+  ILI9488_WriteString(10, 250, "Montando SD Card...", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
+  HAL_Delay(1000); // Delay para o cartão estabilizar
 
-  ILI9488_WriteString(20, 280, "Sistema Iniciado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-  HAL_Delay(2000); // Uma pequena pausa para o usuário ler a mensagem.
+  if (f_mount(&SDFatFS, (TCHAR const*)SDPath, 1) == FR_OK)
+  {
+      localSdMounted = 1; 
+      ILI9488_WriteString(10, 250, "Cartao SD Montado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+  }
+  else
+  {
+      localSdMounted = 0;
+      ILI9488_WriteString(10, 250, "Falha no Cartao SD!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+  }
+  
+  HAL_Delay(2000); // Pausa para o usuário ler
 
-  // 4. Limpa a tela para começar a desenhar.
-  ILI9488_FillScreen(ILI9488_BLACK);
+  /* 3. Criar Mutexes, Pools e Filas */
 
-  /* USER CODE END 2 */
+  osMutexDef(sensorMutex);
+  g_sensorDataMutexHandle = osMutexCreate(osMutex(sensorMutex));
 
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
+  // Pool e Fila de Input
+  osPoolDef(inputPool, 8, InputEvent_t);
+  g_inputPoolHandle = osPoolCreate(osPool(inputPool));
+  osMessageQDef(inputQueue, 8, void*); // Fila de ponteiros
+  g_inputQueueHandle = osMessageCreate(osMessageQ(inputQueue), NULL);
 
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
+  // Pool e Fila de Display
+  osPoolDef(displayPool, 2, DisplayState_t);
+  g_displayPoolHandle = osPoolCreate(osPool(displayPool));
+  osMessageQDef(displayQueue, 2, void*); // Fila de ponteiros
+  g_displayQueueHandle = osMessageCreate(osMessageQ(displayQueue), NULL);
 
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
+  /* 4. Criar Tarefas */
 
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osMutexDef(gameMutex);
-  gameMutexHandle = osMutexCreate(osMutex(gameMutex));
-
-  osThreadDef(initPutHalTask, StartInputHalTask, osPriorityNormal, 0, 128);
-  inputHalTaskHandle = osThreadCreate(osThread(initPutHalTask), NULL);
-
-  osThreadDef(gameTask, StartGameTask, osPriorityNormal, 0, 256);
-  gameTaskHandle = osThreadCreate(osThread(gameTask), NULL);
-
+  // Tarefa de Display (prioridade normal agora)
   osThreadDef(displayTask, StartDisplayTask, osPriorityNormal, 0, 1024);
-  displayTaskHandle = osThreadCreate(osThread(displayTask), NULL);
+  osThreadCreate(osThread(displayTask), NULL);
 
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+  // Tarefa de Lógica do Jogo
+  osThreadDef(gameTask, StartGameTask, osPriorityNormal, 0, 512);
+  // Passa o status do SD como argumento!
+  osThreadCreate(osThread(gameTask), (void*)((uint32_t)localSdMounted)); 
 
-  /* Start scheduler */
+  // Tarefa de Teclado
+  osThreadDef(keypadTask, StartKeypadTask, osPriorityNormal, 0, 128);
+  osThreadCreate(osThread(keypadTask), NULL);
+
+  // Tarefa de Sensores
+  osThreadDef(sensorTask, StartSensorTask, osPriorityNormal, 0, 128);
+  osThreadCreate(osThread(sensorTask), NULL);
+
+  /* 5. Iniciar Scheduler */
   osKernelStart();
 
-  /* We should never get here as control is now taken by the scheduler */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
+  /* Loop infinito */
+  while (1) 
   {
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-    
   }
-  /* USER CODE END 3 */
 }
 
 /**
@@ -504,418 +457,6 @@ static void MX_GPIO_Init(void)
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
-}
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
-
-void StartInputHalTask(void const * argument)
-{
-  /* USER CODE BEGIN 5 */
-  char cCurrent;
-  /* Infinite loop */
-  for(;;) // O loop infinito de uma tarefa RTOS é "for(;;)"
-  {
-    cCurrent = KEYPAD_Scan(); // Escaneia o teclado
-    if(cCurrent != '\0')
-    {
-      keyPressed = cCurrent;
-    }
-    for (int i = 0; i < 4; i++) {
-        TCS3472_ReadData(&hi2c2, i, &colorData[i]);
-    }
-    osDelay(50);
-  }
-}
-
-void StartGameTask(void const * argument)
-{
-  char cLocalKeyPressed;
-  for(;;)
-  {
-    cLocalKeyPressed = NONE_KEY;
-    
-    osMutexWait(gameMutexHandle, osWaitForever);
-    if (keyPressed != NONE_KEY) {
-      cLocalKeyPressed = keyPressed;
-      keyPressed = NONE_KEY; 
-    }
-    osMutexRelease(gameMutexHandle);
-    
-    if (cLocalKeyPressed != NONE_KEY)
-    {
-      osMutexWait(gameMutexHandle, osWaitForever);
-      switch(eCurrentState)
-      {
-        case eInitGame:
-        {
-          eUserPlayer.u8HeartPoints = 100;
-          eCpuPlayer.u8HeartPoints = 100;
-          if(cLocalKeyPressed == CONFIRM_KEY)
-          {
-            eCurrentState = eDificultSelect;
-            selectedOption = 0;
-            u8CleanScreen = TRUE;
-  }
-          break;
-        }
-        case eDificultSelect:
-        {
-          switch(cLocalKeyPressed)
-          {
-            case UP_KEY:
-            {
-              selectedOption = (selectedOption < MENU_OPTIONS_DIFFICULTY - 1) ? selectedOption + 1 : 0;
-              u8CleanScreen = TRUE;
-              break;
-  }
-            case DOWN_KEY:
-            {
-              selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_DIFFICULTY - 1;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case BACK_KEY:
-            {
-              u8CleanScreen = TRUE;
-              eCurrentState = eInitGame;
-              break;
-            }
-            case CONFIRM_KEY:
-            {
-              selectedDifficulty = (EDificult)selectedOption;
-              eCurrentState = ePersonaSelect;
-              selectedOption = FALSE; // Reseta para o próximo menu
-              u8CleanScreen = TRUE;
-              break;
-            }
-            default:
-            {
-              break;
-            }
-          }
-          break;
-        }
-        case ePersonaSelect:
-        {
-          switch(cLocalKeyPressed)
-          {
-            case UP_KEY:
-            {                  
-              selectedOption = (selectedOption < MENU_OPTIONS_PERSONA - 1) ? selectedOption + 1 : 0;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case DOWN_KEY:
-            {
-              selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_PERSONA - 1;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case BACK_KEY:
-            {
-              u8CleanScreen = TRUE;
-              eCurrentState = eDificultSelect;
-              break;
-            }
-            case CONFIRM_KEY:
-            {
-              eUserPlayer.ePersonaElemental = (EElemental)selectedOption;
-              eCurrentState = eBattleInit;
-              u8CleanScreen = TRUE;
-              u8ContAttack = 0;     // Zera o contador de ataques
-              selectedOption = 0;   // Inicia com a primeira opção (Fogo) pré-selecionada
-
-              memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
-              memset((void*)eCpuPlayer.eAttackSequential, 0, sizeof(eCpuPlayer.eAttackSequential));
-
-              srand(HAL_GetTick()); 
-              eCpuPlayer.ePersonaElemental = (rand() % 6);
-              for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
-              {
-                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6); 
-              }
-              break;
-            }
-            default:
-            {
-              break;
-            }
-          }
-          break;
-        }
-        case eBattleInit:
-        {
-          // A lógica de ataque agora só depende das teclas CONFIRM e BACK
-          switch (cLocalKeyPressed)
-          {
-            case CONFIRM_KEY:
-            {
-              // Lê a cor de cada um dos 4 sensores e define a sequência de ataque
-              for (int i = 0; i < ATTACKS_NUMBERS; i++)
-              {
-                  eUserPlayer.eAttackSequential[i] = TCS3472_DetectColor(colorData[i]);
-              }
-
-              // Prepara e inicia a batalha
-              vInitBattle(&eUserPlayer, &eCpuPlayer);
-              eCurrentState = ePlayerTurn;
-              u8CleanScreen = TRUE;
-              break;
-            } 
-            case BACK_KEY:
-            {
-              eCurrentState = ePersonaSelect;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            default:
-              // Ignora outras teclas, pois a tela se atualiza sozinha
-              break;
-          }
-          break;
-        }
-        case ePlayerTurn:
-        {
-          if(cLocalKeyPressed == CONFIRM_KEY)
-          {            
-            if (eUserPlayer.u8HeartPoints == 0 || eCpuPlayer.u8HeartPoints == 0)
-            {
-              eCurrentState = eEndGame; 
-            }
-            else
-            {
-              // Ninguém perdeu, volta para selecionar novos ataques
-              eCurrentState = eBattleInit;
-              u8ContAttack = 0; // Prepara para o novo round
-              selectedOption = 0;
-              memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
-              
-              // Gera novos ataques para a CPU para o próximo round
-              for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
-              {
-                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6);
-              }
-            }
-            u8CleanScreen = TRUE;
-          }
-          break;
-        }
-        case eEndGame:
-        {
-          if(cLocalKeyPressed == CONFIRM_KEY)
-          {
-            eCurrentState = eInitGame;
-            u8CleanScreen = TRUE;
-          }
-          break;
-        }
-        default:
-        {
-          // Estado desconhecido, volta para o início por segurança
-          eCurrentState = eInitGame;
-          u8CleanScreen = TRUE;
-          break;
-        }
-      }
-      osMutexRelease(gameMutexHandle);
-    }
-    osDelay(50);
-  }
-}
-
-void StartDisplayTask(void const * argument)
-{
-  /* USER CODE BEGIN StartDisplayTask */
-  char buffer[30];
-  // uint8_t u8RedrawScreen = FALSE; // Não precisamos mais desta variável local
-  EGameStates ePreviousState = eInitGame;
-
-  FRESULT fres;
-
-  // Damos um pequeno delay para garantir que tudo estabilizou
-  osDelay(500); 
-
-  // Tenta montar o SD (o "1" significa montar imediatamente)
-  fres = f_mount(&SDFatFS, (TCHAR const*)SDPath, 1);
-  
-  if (fres == FR_OK)
-  {
-      // Sucesso!
-      sdCardMounted = 1; 
-      ILI9488_WriteString(10, 10, "Cartao SD Montado!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-  }
-  else
-  {
-      // Falha!
-      sdCardMounted = 0;
-      sprintf(buffer, "Falha SD: %d", (int)fres); // Exibe o código de erro
-      ILI9488_WriteString(10, 10, buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
-      
-      if (fres == FR_NOT_READY) {
-          ILI9488_WriteString(10, 25, "FR_NOT_READY", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-      }
-  }
-
-  // A flag u8CleanScreen deve estar TRUE por padrão no início para forçar o primeiro desenho
-  osMutexWait(gameMutexHandle, osWaitForever);
-  u8CleanScreen = TRUE;
-  osMutexRelease(gameMutexHandle);
-
-
-  for(;;)
-  {
-    // --- Leitura segura das variáveis globais ---
-    osMutexWait(gameMutexHandle, osWaitForever);
-    EGameStates eLocalCurrentState = eCurrentState;
-    uint8_t bNeedsRedraw = u8CleanScreen; // Verifica a flag que a GameTask define
-    osMutexRelease(gameMutexHandle);
-    // --- Fim da leitura segura ---
-
-    // CONDIÇÃO DE REDESENHO CORRIGIDA:
-    // Redesenha se o estado mudou (ex: menu -> jogo) OU
-    // se a lógica do jogo (GameTask) pediu (ex: mudou a opção do menu)
-    if(eLocalCurrentState != ePreviousState || bNeedsRedraw == TRUE)
-    {
-      // Limpa a tela
-      ClearScreen(); 
-
-      // --- Reseta a flag ---
-      // Já que vamos redesenhar, precisamos zerar a flag.
-      if (bNeedsRedraw == TRUE) {
-        osMutexWait(gameMutexHandle, osWaitForever);
-        u8CleanScreen = FALSE; // Flag tratada!
-        osMutexRelease(gameMutexHandle);
-      }
-      // --- Fim do reset da flag ---
-
-      switch(eLocalCurrentState)
-      {
-          case eInitGame:
-          {
-            if (sdCardMounted) {
-                // Tenta ler do SD
-                if (!ILI9488_DrawImage_BIN(100, 100, 30, 30, "0:/fire30.bin")) {
-                    ILI9488_WriteString(0, 10, "Falha ao ler background.bin", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-                }
-            } else {
-                // Fallback: Se o SD falhou, usa a imagem da flash
-                ILI9488_WriteString(10, 10, "SD Falhou. Lendo flash.", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-            }
-            break;
-          }
-          case eDificultSelect:
-          {
-            // Agora, esta função será chamada com o 'selectedOption' ATUALIZADO
-            DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
-            break;
-          }
-          case ePersonaSelect:
-          {
-            // E aqui também
-            DrawMenu("Selecione Personagem", personaOptions, MENU_OPTIONS_PERSONA, selectedOption);
-            break;
-          }
-          case eBattleInit:
-          {
-            ILI9488_WriteString(10, 15, "Prepare seus ataques!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            ILI9488_WriteString(10, 35, "Posicione os 4 cubos e pressione *", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
-            for (int i = 0; i < 4; i++) {
-              sprintf(buffer, "Sensor %d:", i + 1);
-              ILI9488_WriteString(20, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-              }
-            break;
-          }
-          case ePlayerTurn:
-          {
-            ILI9488_WriteString(10, 20, "Resultado do Round", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            sprintf(buffer, "Sua Vida: %d", eUserPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 60, buffer, Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-            sprintf(buffer, "Vida CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 90, buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
-            ILI9488_WriteString(10, 130, "Seus Ataques:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
-                uint16_t attackColor = ILI9488_WHITE;
-                switch(eUserPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9488_RED;   break;
-                    case eBlue:   attackColor = ILI9488_BLUE;  break;
-                    case eGreen:  attackColor = ILI9488_CYAN;  break;
-                    case eYellow: attackColor = ILI9488_BROWN; break;
-                    case eWhite:  attackColor = ILI9488_WHITE; break;
-                    case eBlack:  attackColor = ILI9488_GRAY;  break;
-                }
-                ILI9488_FillRectangle(10 + (i * 30), 150, 20, 20, attackColor);
-            }
-            ILI9488_WriteString(10, 190, "Ataques CPU:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
-                uint16_t attackColor = ILI9488_WHITE;
-                switch(eCpuPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9488_RED;   break;
-                    case eBlue:   attackColor = ILI9488_BLUE;  break;
-                    case eGreen:  attackColor = ILI9488_CYAN;  break;
-                    case eYellow: attackColor = ILI9488_BROWN; break;
-                    case eWhite:  attackColor = ILI9488_WHITE; break;
-                    case eBlack:  attackColor = ILI9488_GRAY;  break;
-                }
-                ILI9488_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
-            }
-            ILI9488_WriteString(10, 280, "Pressione * para continuar...", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
-            break;
-          }
-          case eEndGame:
-          {
-            if (eUserPlayer.u8HeartPoints > 0) {
-                ILI9488_WriteString(70, 80, "VITORIA!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-            } else {
-                ILI9488_WriteString(70, 80, "DERROTA!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-            }
-            sprintf(buffer, "Sua Vida Final: %d", eUserPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 140, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            sprintf(buffer, "Vida Final CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 160, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            ILI9488_WriteString(10, 250, "Pressione * para recomecar", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
-            break;
-          }
-          default:
-          {
-            ILI9488_WriteString(10, 10, "Erro de Estado!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-            break;
-          }
-      }
-      ePreviousState = eLocalCurrentState;    
-    }
-
-    // Esta parte (atualização em tempo real dos sensores) está correta e
-    // deve ficar FORA do 'if' de redesenho principal.
-    if (eLocalCurrentState == eBattleInit)
-    {
-        for (int i = 0; i < 4; i++) {
-            EColor detectedColor = TCS3472_DetectColor(colorData[i]);
-            uint16_t colorBox = ILI9488_BLACK;
-            char colorName[10] = "Vazio";
-
-            switch(detectedColor) {
-                case eRed:    colorBox = ILI9488_RED;   strcpy(colorName, "Fogo");   break;
-                case eBlue:   colorBox = ILI9488_BLUE;  strcpy(colorName, "Agua");   break;
-                case eGreen:  colorBox = ILI9488_CYAN;  strcpy(colorName, "Ar");     break;
-                case eYellow: colorBox = ILI9488_BROWN; strcpy(colorName, "Terra");  break;
-                case eWhite:  colorBox = ILI9488_WHITE; strcpy(colorName, "Luz?");   break;
-                default: break;
-            }
-
-            // APAGA a área do nome da cor antiga desenhando um retângulo preto por cima
-            ILI9488_FillRectangle(100, 80 + (i * 30), 45, 10, ILI9488_BLACK);
-            // Escreve o novo nome da cor
-            ILI9488_WriteString(100, 80 + (i * 30), colorName, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            // Redesenha o quadrado colorido
-            ILI9488_FillRectangle(150, 75 + (i * 30), 20, 20, colorBox);
-        }
-    }
-
-    osDelay(10); // Reduzido de HAL_Delay para osDelay para ser RTOS-friendly
-  }
-  /* USER CODE END StartDisplayTask */
 }
 
 /**

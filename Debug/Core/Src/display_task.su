@@ -1,0 +1,2 @@
+../Core/Src/display_task.c:28:13:vDrawBattleDynamicSensorUpdate	88	static
+../Core/Src/display_task.c:64:6:StartDisplayTask	96	static

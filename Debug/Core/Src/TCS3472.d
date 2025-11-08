@@ -32,7 +32,7 @@ Core/Src/TCS3472.o: ../Core/Src/TCS3472.c ../Core/Inc/TCS3472.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/game_types.h
+ ../Core/Inc/game_types.h ../Core/Inc/TCA9548A.h
 ../Core/Inc/TCS3472.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
@@ -69,3 +69,4 @@ Core/Src/TCS3472.o: ../Core/Src/TCS3472.c ../Core/Inc/TCS3472.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 ../Core/Inc/game_types.h:
+../Core/Inc/TCA9548A.h:

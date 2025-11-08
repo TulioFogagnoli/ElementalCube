@@ -1,0 +1,2 @@
+../Core/Src/input_task.c:16:6:StartKeypadTask	24	static
+../Core/Src/input_task.c:41:6:StartSensorTask	64	static

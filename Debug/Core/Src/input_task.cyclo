@@ -1,0 +1,2 @@
+../Core/Src/input_task.c:16:6:StartKeypadTask	3
+../Core/Src/input_task.c:41:6:StartSensorTask	3
