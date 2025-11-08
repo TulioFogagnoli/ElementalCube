@@ -1,58 +1,98 @@
 #include "keypad.h"
-#include "main.h" // Onde os defines dos pinos (User Labels) estão
+#include "main.h" // Inclui as definições da HAL E os defines BTN_... e de caracteres
 
-// Mapeamento do teclado 4x4
-const char KEYPAD_MAP[4][4] = {
-    {'1', '2', '3', 'A'},
-    {'4', '5', '6', 'B'},
-    {'7', '8', '9', 'C'},
-    {'*', '0', '#', 'D'}
-};
+/*
+==================================================================================
+ PASSO 1: MAPEAMENTO FÍSICO DOS PINOS
+ 
+ Não é mais necessário! Os defines (BTN_UP_PORT, BTN_UP_PIN, etc.)
+ agora estão (corretamente) no seu arquivo "main.h".
 
-// Estruturas para facilitar o acesso aos pinos
-typedef struct {
-    GPIO_TypeDef* PORT;
-    uint16_t PIN;
-} Keypad_Pin_t;
-
-// Pinos das colunas (saídas)
-Keypad_Pin_t C_PINS[4] = {{C4_GPIO_Port, C4_Pin}, {C3_GPIO_Port, C3_Pin}, {C2_GPIO_Port, C2_Pin}, {C1_GPIO_Port, C1_Pin}};
-// Pinos das linhas (entradas)
-Keypad_Pin_t R_PINS[4] = {{R2_GPIO_Port, R2_Pin}, {R1_GPIO_Port, R1_Pin}, {R3_GPIO_Port, R3_Pin}, {R4_GPIO_Port, R4_Pin}};
+==================================================================================
+*/
 
 
+/*
+==================================================================================
+ PASSO 2: MAPEAMENTO DOS CARACTERES DO JOGO (A CORREÇÃO ESTÁ AQUI!)
+ 
+ Lógica do main.c:
+ - '8' (UP_KEY) move a seleção para BAIXO (+1)
+ - '2' (DOWN_KEY) move a seleção para CIMA (-1)
+
+ Nossa lógica (para corrigir a inversão):
+ - Botão CIMA (Verde, PD6) deve enviar '2' (DOWN_KEY) para mover a seleção para CIMA.
+ - Botão BAIXO (Amarelo, PD7) deve enviar '8' (UP_KEY) para mover a seleção para BAIXO.
+==================================================================================
+*/
+#define BUTTON_CONFIRM_CHAR  CONFIRM_KEY // Usa o define de main.h ('*')
+#define BUTTON_BACK_CHAR     BACK_KEY    // Usa o define de main.h ('#')
+#define BUTTON_UP_CHAR       DOWN_KEY    // Verde (Cima) envia '2'
+#define BUTTON_DOWN_CHAR     UP_KEY      // Amarelo (Baixo) envia '8'
+
+
+/*
+==================================================================================
+ PASSO 3: LÓGICA DE DETECÇÃO DE BORDA (NÃO-BLOQUEANTE)
+ (Sem alterações aqui)
+==================================================================================
+*/
+static uint8_t btn_up_state = 1;      // Verde
+static uint8_t btn_down_state = 1;    // Amarelo
+static uint8_t btn_confirm_state = 1; // Vermelho
+static uint8_t btn_back_state = 1;    // Preto
+
+
+/**
+ * @brief Função não-bloqueante que detecta a borda de descida (press) 
+ * de botões momentâneos.
+ * Esta função é chamada a cada 50ms pela StartInputHalTask.
+ */
 char KEYPAD_Scan(void) {
-    // Coloca todas as colunas em nível alto
-    for (int i = 0; i < 4; i++) {
-        HAL_GPIO_WritePin(C_PINS[i].PORT, C_PINS[i].PIN, GPIO_PIN_SET);
+    
+    // ----- Lógica do Botão CIMA (Verde - PD6) -----
+    // Usamos BTN_UP_PORT e BTN_UP_PIN direto de main.h
+    uint8_t current_up = HAL_GPIO_ReadPin(BTN_UP_PORT, BTN_UP_PIN);
+    if (current_up == GPIO_PIN_RESET && btn_up_state == 1) {
+        btn_up_state = 0;
+        return BUTTON_UP_CHAR; // Retorna '2'
+    } 
+    else if (current_up == GPIO_PIN_SET && btn_up_state == 0) {
+        btn_up_state = 1;
     }
 
-    // Loop para varrer cada coluna
-    for (int col = 0; col < 4; col++) {
-        // Ativa a coluna atual (coloca em nível baixo)
-        HAL_GPIO_WritePin(C_PINS[col].PORT, C_PINS[col].PIN, GPIO_PIN_RESET);
-
-        // Verifica qual linha foi para nível baixo
-        for (int row = 0; row < 4; row++) {
-            if (HAL_GPIO_ReadPin(R_PINS[row].PORT, R_PINS[row].PIN) == GPIO_PIN_RESET) {
-                // Botão pressionado!
-                
-                // --- Debounce e espera soltar a tecla ---
-                HAL_Delay(50); // Simples debounce por atraso
-
-                // Espera o usuário soltar a tecla para não ler a mesma tecla várias vezes
-                while(HAL_GPIO_ReadPin(R_PINS[row].PORT, R_PINS[row].PIN) == GPIO_PIN_RESET);
-                
-                // Restaura a coluna para nível alto antes de retornar
-                HAL_GPIO_WritePin(C_PINS[col].PORT, C_PINS[col].PIN, GPIO_PIN_SET);
-
-                return KEYPAD_MAP[row][col];
-            }
-        }
-
-        // Desativa a coluna atual antes de ir para a próxima
-        HAL_GPIO_WritePin(C_PINS[col].PORT, C_PINS[col].PIN, GPIO_PIN_SET);
+    // ----- Lógica do Botão BAIXO (Amarelo - PD7) -----
+    // Usamos BTN_DOWN_PORT e BTN_DOWN_PIN direto de main.h
+    uint8_t current_down = HAL_GPIO_ReadPin(BTN_DOWN_PORT, BTN_DOWN_PIN);
+    if (current_down == GPIO_PIN_RESET && btn_down_state == 1) {
+        btn_down_state = 0;
+        return BUTTON_DOWN_CHAR; // Retorna '8'
+    } 
+    else if (current_down == GPIO_PIN_SET && btn_down_state == 0) {
+        btn_down_state = 1;
     }
 
-    return '\0'; // Retorna nulo se nenhuma tecla for pressionada
+    // ----- Lógica do Botão CONFIRMAR (Vermelho - PD4) -----
+    // Usamos BTN_CONFIRM_PORT e BTN_CONFIRM_PIN direto de main.h
+    uint8_t current_confirm = HAL_GPIO_ReadPin(BTN_CONFIRM_PORT, BTN_CONFIRM_PIN);
+    if (current_confirm == GPIO_PIN_RESET && btn_confirm_state == 1) {
+        btn_confirm_state = 0;
+        return BUTTON_CONFIRM_CHAR; // Retorna '*'
+    } 
+    else if (current_confirm == GPIO_PIN_SET && btn_confirm_state == 0) {
+        btn_confirm_state = 1;
+    }
+
+    // ----- Lógica do Botão VOLTAR (Preto - PD5) -----
+    // Usamos BTN_BACK_PORT e BTN_BACK_PIN direto de main.h
+    uint8_t current_back = HAL_GPIO_ReadPin(BTN_BACK_PORT, BTN_BACK_PIN);
+    if (current_back == GPIO_PIN_RESET && btn_back_state == 1) {
+        btn_back_state = 0;
+        return BUTTON_BACK_CHAR; // Retorna '#'
+    } 
+    else if (current_back == GPIO_PIN_SET && btn_back_state == 0) {
+        btn_back_state = 1;
+    }
+
+    return '\0'; // Retorna nulo se nenhuma *nova* tecla for pressionada
 }

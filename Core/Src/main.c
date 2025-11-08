@@ -469,13 +469,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LCD_RST_Pin|LCD_DC_Pin|C3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, LCD_RST_Pin|LCD_DC_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, C1_Pin|C2_Pin|C4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LCD_CS_Pin */
   GPIO_InitStruct.Pin = LCD_CS_Pin;
@@ -484,8 +481,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LCD_RST_Pin LCD_DC_Pin C3_Pin */
-  GPIO_InitStruct.Pin = LCD_RST_Pin|LCD_DC_Pin|C3_Pin;
+  /*Configure GPIO pins : LCD_RST_Pin LCD_DC_Pin */
+  GPIO_InitStruct.Pin = LCD_RST_Pin|LCD_DC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -498,15 +495,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : C1_Pin C2_Pin C4_Pin */
-  GPIO_InitStruct.Pin = C1_Pin|C2_Pin|C4_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
   /*Configure GPIO pins : R1_Pin R2_Pin R3_Pin R4_Pin */
-  GPIO_InitStruct.Pin = R1_Pin|R2_Pin|R3_Pin|R4_Pin;
+  GPIO_InitStruct.Pin = BTN_CONFIRM_PIN |BTN_BACK_PIN|BTN_UP_PIN|BTN_DOWN_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
@@ -739,7 +729,7 @@ void StartDisplayTask(void const * argument)
 {
   /* USER CODE BEGIN StartDisplayTask */
   char buffer[30];
-  uint8_t u8RedrawScreen = FALSE;
+  // uint8_t u8RedrawScreen = FALSE; // Não precisamos mais desta variável local
   EGameStates ePreviousState = eInitGame;
 
   FRESULT fres;
@@ -768,15 +758,37 @@ void StartDisplayTask(void const * argument)
       }
   }
 
+  // A flag u8CleanScreen deve estar TRUE por padrão no início para forçar o primeiro desenho
+  osMutexWait(gameMutexHandle, osWaitForever);
+  u8CleanScreen = TRUE;
+  osMutexRelease(gameMutexHandle);
+
+
   for(;;)
   {
+    // --- Leitura segura das variáveis globais ---
     osMutexWait(gameMutexHandle, osWaitForever);
     EGameStates eLocalCurrentState = eCurrentState;
+    uint8_t bNeedsRedraw = u8CleanScreen; // Verifica a flag que a GameTask define
     osMutexRelease(gameMutexHandle);
+    // --- Fim da leitura segura ---
 
-    if(eLocalCurrentState != ePreviousState)
+    // CONDIÇÃO DE REDESENHO CORRIGIDA:
+    // Redesenha se o estado mudou (ex: menu -> jogo) OU
+    // se a lógica do jogo (GameTask) pediu (ex: mudou a opção do menu)
+    if(eLocalCurrentState != ePreviousState || bNeedsRedraw == TRUE)
     {
-      ClearScreen();
+      // Limpa a tela
+      ClearScreen(); 
+
+      // --- Reseta a flag ---
+      // Já que vamos redesenhar, precisamos zerar a flag.
+      if (bNeedsRedraw == TRUE) {
+        osMutexWait(gameMutexHandle, osWaitForever);
+        u8CleanScreen = FALSE; // Flag tratada!
+        osMutexRelease(gameMutexHandle);
+      }
+      // --- Fim do reset da flag ---
 
       switch(eLocalCurrentState)
       {
@@ -795,11 +807,13 @@ void StartDisplayTask(void const * argument)
           }
           case eDificultSelect:
           {
+            // Agora, esta função será chamada com o 'selectedOption' ATUALIZADO
             DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
             break;
           }
           case ePersonaSelect:
           {
+            // E aqui também
             DrawMenu("Selecione Personagem", personaOptions, MENU_OPTIONS_PERSONA, selectedOption);
             break;
           }
@@ -872,8 +886,10 @@ void StartDisplayTask(void const * argument)
       ePreviousState = eLocalCurrentState;    
     }
 
+    // Esta parte (atualização em tempo real dos sensores) está correta e
+    // deve ficar FORA do 'if' de redesenho principal.
     if (eLocalCurrentState == eBattleInit)
-  {
+    {
         for (int i = 0; i < 4; i++) {
             EColor detectedColor = TCS3472_DetectColor(colorData[i]);
             uint16_t colorBox = ILI9488_BLACK;
@@ -897,7 +913,7 @@ void StartDisplayTask(void const * argument)
         }
     }
 
-    HAL_Delay(10);
+    osDelay(10); // Reduzido de HAL_Delay para osDelay para ser RTOS-friendly
   }
   /* USER CODE END StartDisplayTask */
 }

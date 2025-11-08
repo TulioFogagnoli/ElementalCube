@@ -6,8 +6,8 @@
 ../Core/Src/main.c:403:13:MX_UART4_Init	2
 ../Core/Src/main.c:434:13:MX_DMA_Init	1
 ../Core/Src/main.c:455:13:MX_GPIO_Init	1
-../Core/Src/main.c:523:6:StartInputHalTask	3
-../Core/Src/main.c:542:6:StartGameTask	31
-../Core/Src/main.c:738:6:StartDisplayTask	35
-../Core/Src/main.c:913:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:931:6:Error_Handler	1
+../Core/Src/main.c:513:6:StartInputHalTask	3
+../Core/Src/main.c:532:6:StartGameTask	31
+../Core/Src/main.c:728:6:StartDisplayTask	37
+../Core/Src/main.c:929:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:947:6:Error_Handler	1

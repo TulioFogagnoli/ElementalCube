@@ -71,22 +71,14 @@ void Error_Handler(void);
 #define LCD_DC_GPIO_Port GPIOB
 #define LCD_LED_Pin GPIO_PIN_7
 #define LCD_LED_GPIO_Port GPIOC
-#define C1_Pin GPIO_PIN_0
-#define C1_GPIO_Port GPIOD
-#define C2_Pin GPIO_PIN_1
-#define C2_GPIO_Port GPIOD
-#define C3_Pin GPIO_PIN_3
-#define C3_GPIO_Port GPIOB
-#define C4_Pin GPIO_PIN_3
-#define C4_GPIO_Port GPIOD
-#define R1_Pin GPIO_PIN_4
-#define R1_GPIO_Port GPIOD
-#define R2_Pin GPIO_PIN_5
-#define R2_GPIO_Port GPIOD
-#define R3_Pin GPIO_PIN_6
-#define R3_GPIO_Port GPIOD
-#define R4_Pin GPIO_PIN_7
-#define R4_GPIO_Port GPIOD
+#define BTN_CONFIRM_PORT  GPIOD
+#define BTN_CONFIRM_PIN   GPIO_PIN_4
+#define BTN_BACK_PORT     GPIOD
+#define BTN_BACK_PIN      GPIO_PIN_5
+#define BTN_UP_PORT       GPIOD
+#define BTN_UP_PIN        GPIO_PIN_6
+#define BTN_DOWN_PORT     GPIOD
+#define BTN_DOWN_PIN      GPIO_PIN_7
 
 
 /* USER CODE BEGIN Private defines */
