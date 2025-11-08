@@ -226,7 +226,7 @@ int main(void)
   osThreadDef(gameTask, StartGameTask, osPriorityNormal, 0, 256);
   gameTaskHandle = osThreadCreate(osThread(gameTask), NULL);
 
-  osThreadDef(displayTask, StartDisplayTask, osPriorityNormal, 0, 256);
+  osThreadDef(displayTask, StartDisplayTask, osPriorityNormal, 0, 1024);
   displayTaskHandle = osThreadCreate(osThread(displayTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -767,15 +767,12 @@ void StartDisplayTask(void const * argument)
           ILI9488_WriteString(10, 25, "FR_NOT_READY", Font_7x10, ILI9488_RED, ILI9488_BLACK);
       }
   }
-  osDelay(2000); // Pausa para lermos a mensagem
 
   for(;;)
   {
     osMutexWait(gameMutexHandle, osWaitForever);
     EGameStates eLocalCurrentState = eCurrentState;
     osMutexRelease(gameMutexHandle);
-
-
 
     if(eLocalCurrentState != ePreviousState)
     {
@@ -787,12 +784,12 @@ void StartDisplayTask(void const * argument)
           {
             if (sdCardMounted) {
                 // Tenta ler do SD
-                if (!ILI9488_DrawImage_BIN(10, 10, 300, 300, "0:/logo.bin")) {
-                    ILI9488_WriteString(0, 400, "Falha ao ler logo.bin", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+                if (!ILI9488_DrawImage_BIN(100, 100, 30, 30, "0:/fire30.bin")) {
+                    ILI9488_WriteString(0, 10, "Falha ao ler background.bin", Font_7x10, ILI9488_RED, ILI9488_BLACK);
                 }
             } else {
                 // Fallback: Se o SD falhou, usa a imagem da flash
-                ILI9488_WriteString(0, 400, "SD Falhou. Lendo flash.", Font_7x10, ILI9488_RED, ILI9488_BLACK);
+                ILI9488_WriteString(10, 10, "SD Falhou. Lendo flash.", Font_7x10, ILI9488_RED, ILI9488_BLACK);
             }
             break;
           }

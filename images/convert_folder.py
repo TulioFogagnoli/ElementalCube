@@ -1,74 +1,78 @@
-# convert_folder.py
-from PIL import Image
-import sys
 import os
+import sys
+from PIL import Image
 
-def convert_to_rgb565(r, g, b):
-    """Converte uma cor de 24 bits (RGB888) para 16 bits (RGB565)."""
-    return ((r & 0b11111000) << 8) | ((g & 0b11111100) << 3) | (b >> 3)
-
-def process_image(input_path, output_path):
+def convert_image_to_rgb666(image_path, output_path):
     """
-    Converte uma única imagem PNG para um ficheiro binário bruto no formato RGB565.
+    Converte uma imagem para o formato binário RGB666 (3 bytes por pixel).
     """
     try:
-        image = Image.open(input_path).convert('RGB')
+        img = Image.open(image_path).convert('RGB')
+        width, height = img.size
+        pixels = img.load()
+
+        print(f"Convertendo '{image_path}' ({width}x{height}) -> '{output_path}' (RGB666, 3 bytes/pixel)")
+
+        with open(output_path, 'wb') as f:
+            for y in range(height):
+                # ==========================================================
+                # A LINHA ABAIXO FOI CORRIGIDA (REMOVIDO O 'range' EXTRA)
+                for x in range(width):
+                # ==========================================================
+                    r_8bit, g_8bit, b_8bit = pixels[x, y]
+                    
+                    # Converte de RGB888 (0-255) para RGB666 (0-63)
+                    r_6bit = (r_8bit >> 2) & 0x3F
+                    g_6bit = (g_8bit >> 2) & 0x3F
+                    b_6bit = (b_8bit >> 2) & 0x3F
+                    
+                    # Salva os 3 bytes (R, G, B)
+                    f.write(r_6bit.to_bytes(1, byteorder='little'))
+                    f.write(g_6bit.to_bytes(1, byteorder='little'))
+                    f.write(b_6bit.to_bytes(1, byteorder='little'))
+
     except Exception as e:
-        print(f"Erro ao abrir a imagem '{input_path}': {e}")
-        return
+        print(f"ERRO ao converter '{image_path}': {e}")
 
-    width, height = image.size
-    print(f"Convertendo '{os.path.basename(input_path)}' ({width}x{height})...")
-
-    with open(output_path, 'wb') as f_out:
-        for y in range(height):
-            for x in range(width):
-                r, g, b = image.getpixel((x, y))
-                rgb565 = convert_to_rgb565(r, g, b)
-                f_out.write(rgb565.to_bytes(2, 'little'))
-
-def convert_folder(input_folder, output_folder):
+def process_folder(input_dir, output_dir):
     """
-    Converte todos os ficheiros .png numa pasta de entrada para ficheiros .bin na pasta de saída.
+    Varre o diretório de entrada, converte todas as imagens .png
+    e salva os arquivos .bin no diretório de saída.
     """
-    # Verifica se a pasta de entrada existe
-    if not os.path.isdir(input_folder):
-        print(f"Erro: A pasta de entrada '{input_folder}' não existe.")
-        return
-
-    # Cria a pasta de saída se ela não existir
-    os.makedirs(output_folder, exist_ok=True)
     
-    print(f"Procurando por imagens .png em '{input_folder}'...")
-    converted_count = 0
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Diretório de saída criado: '{output_dir}'")
 
-    # Itera sobre todos os ficheiros na pasta de entrada
-    for filename in os.listdir(input_folder):
-        # Verifica se o ficheiro é um .png
-        if filename.lower().endswith(".png"):
-            input_path = os.path.join(input_folder, filename)
+    found_images = 0
+    for filename in os.listdir(input_dir):
+        if filename.lower().endswith('.png'):
+            found_images += 1
             
-            # Cria o nome do ficheiro de saída
-            base_name = os.path.splitext(filename)[0]
-            output_path = os.path.join(output_folder, base_name + ".bin")
+            input_path = os.path.join(input_dir, filename)
             
-            # Converte a imagem
-            process_image(input_path, output_path)
-            converted_count += 1
+            output_filename = os.path.splitext(filename)[0] + '.bin'
+            output_path = os.path.join(output_dir, output_filename)
             
-    if converted_count == 0:
-        print("Nenhum ficheiro .png encontrado para converter.")
+            convert_image_to_rgb666(input_path, output_path)
+
+    if found_images == 0:
+        print(f"Nenhum arquivo .png encontrado em '{input_dir}'")
     else:
-        print(f"\nConversão concluída! {converted_count} ficheiro(s) convertido(s) para a pasta '{output_folder}'.")
+        print(f"\nConcluído! {found_images} imagens convertidas e salvas em '{output_dir}'.")
 
-
+# --- Início da Execução ---
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Uso: python convert_folder.py <pasta_de_entrada> <pasta_de_saida>")
-        print("Exemplo: python convert_folder.py ./minhas_imagens ./bin_para_sd")
+        print("Uso: python convert_folder.py <diretorio_de_entrada> <diretorio_de_saida>")
+        print("Exemplo: python images/convert_folder.py images/ bin/")
         sys.exit(1)
 
-    input_dir = sys.argv[1]
-    output_dir = sys.argv[2]
+    input_folder = sys.argv[1]
+    output_folder = sys.argv[2]
     
-    convert_folder(input_dir, output_dir)
+    if not os.path.isdir(input_folder):
+        print(f"Erro: O diretório de entrada '{input_folder}' não existe.")
+        sys.exit(1)
+
+    process_folder(input_folder, output_folder)

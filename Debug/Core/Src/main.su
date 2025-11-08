@@ -9,5 +9,5 @@
 ../Core/Src/main.c:523:6:StartInputHalTask	24	static
 ../Core/Src/main.c:542:6:StartGameTask	32	static
 ../Core/Src/main.c:738:6:StartDisplayTask	104	static
-../Core/Src/main.c:916:6:HAL_TIM_PeriodElapsedCallback	16	static
-../Core/Src/main.c:934:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:913:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/main.c:931:6:Error_Handler	4	static,ignoring_inline_asm

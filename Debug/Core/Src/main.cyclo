@@ -9,5 +9,5 @@
 ../Core/Src/main.c:523:6:StartInputHalTask	3
 ../Core/Src/main.c:542:6:StartGameTask	31
 ../Core/Src/main.c:738:6:StartDisplayTask	35
-../Core/Src/main.c:916:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:934:6:Error_Handler	1
+../Core/Src/main.c:913:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:931:6:Error_Handler	1
