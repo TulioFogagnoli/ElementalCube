@@ -22,7 +22,7 @@
 #include "main.h"
 /* USER CODE BEGIN Includes */
 extern DMA_HandleTypeDef hdma_sdio_rx;
-
+extern DMA_HandleTypeDef hdma_spi1_tx;
 extern DMA_HandleTypeDef hdma_sdio_tx;
 /* USER CODE END Includes */
 
@@ -333,9 +333,33 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    /* SPI1 interrupt Init */
-    HAL_NVIC_SetPriority(SPI1_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(SPI1_IRQn);
+    /* SPI1 DMA Init */
+    hspi->hdmatx = &hdma_spi1_tx; // Assume que você declarou hdma_spi1_tx extern
+    
+    hdma_spi1_tx.Instance = DMA2_Stream5; // Stream 3 (ou outro disponível)
+    hdma_spi1_tx.Init.Channel = DMA_CHANNEL_3; // Canal 3 para SPI1 TX
+    hdma_spi1_tx.Init.Direction = DMA_MEMORY_TO_PERIPH; // RAM -> SPI
+    hdma_spi1_tx.Init.PeriphInc = DMA_PINC_DISABLE; // Endereço do SPI não muda
+    hdma_spi1_tx.Init.MemInc = DMA_MINC_ENABLE; // Endereço da RAM avança
+    hdma_spi1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE; // 8-bit (DataSize = 8BIT)
+    hdma_spi1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE; // 8-bit
+    hdma_spi1_tx.Init.Mode = DMA_NORMAL; // Modo normal de transferência
+    hdma_spi1_tx.Init.Priority = DMA_PRIORITY_MEDIUM; // Prioridade Média
+    hdma_spi1_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    hdma_spi1_tx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_1QUARTERFULL;
+    hdma_spi1_tx.Init.MemBurst = DMA_MBURST_SINGLE; // Transferência em pacotes de 4
+    hdma_spi1_tx.Init.PeriphBurst = DMA_PBURST_SINGLE;
+    
+    if (HAL_DMA_Init(&hdma_spi1_tx) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(hspi, hdmatx, hdma_spi1_tx); // Liga o DMA ao handle SPI
+
+    /* Configuração da Interrupção DMA */
+    HAL_NVIC_SetPriority(DMA2_Stream5_IRQn, 5, 0); // Ajuste a prioridade conforme seu RTOS
+    HAL_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
     /* USER CODE BEGIN SPI1_MspInit 1 */
 
     /* USER CODE END SPI1_MspInit 1 */

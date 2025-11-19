@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include "FreeRTOS.h" 
 #include "task.h"     
+extern osSemaphoreId spiTxSemaHandle; 
+
 
 // Funções estáticas (privadas para este arquivo)
 static void ILI9488_Select() {
@@ -33,6 +35,17 @@ static void ILI9488_WriteData(uint8_t* buff, size_t buff_size) {
     HAL_GPIO_WritePin(ILI9488_DC_GPIO_Port, ILI9488_DC_Pin, GPIO_PIN_SET);
     // Não otimizar para chunks pequenos como 1 ou 3 bytes
     HAL_SPI_Transmit(&ILI9488_SPI_PORT, buff, buff_size, HAL_MAX_DELAY);
+}
+
+static void ILI9488_WriteDataDMA(uint8_t* buff, size_t buff_size) {
+    HAL_GPIO_WritePin(ILI9488_DC_GPIO_Port, ILI9488_DC_Pin, GPIO_PIN_SET);
+
+    osSemaphoreWait(spiTxSemaHandle, 0);
+    // Inicia a transferência
+    HAL_SPI_Transmit_DMA(&ILI9488_SPI_PORT, buff, buff_size);
+    
+    // Bloqueia a DisplayTask até que o DMA termine e o Semáforo seja liberado pelo Callback
+    osSemaphoreWait(spiTxSemaHandle, osWaitForever);
 }
 
 static void ILI9488_WriteSmallData(uint8_t data) {
@@ -117,7 +130,6 @@ void ILI9488_DrawPixel(uint16_t x, uint16_t y, uint16_t color) {
 
     uint8_t data[] = {r, g, b};
     ILI9488_WriteData(data, sizeof(data));
-    
     ILI9488_Unselect();
 }
 
@@ -219,7 +231,7 @@ void ILI9488_DrawImage_RGB666(uint16_t x, uint16_t y, uint16_t w, uint16_t h, co
         // Calcula o ponteiro para o início da linha atual
         const uint8_t* p_line_data = data + (i * line_size_bytes);
         // Envia a linha inteira para o display
-        ILI9488_WriteData((uint8_t*)p_line_data, line_size_bytes);
+        ILI9488_WriteDataDMA((uint8_t*)p_line_data, line_size_bytes);
     }
     
     ILI9488_Unselect();
@@ -282,7 +294,7 @@ uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, co
         // Os dados em line_buffer já estão no formato que o display espera.
         
         // Envia a linha (RGB666) para o display
-        ILI9488_WriteData(line_buffer, line_size_bytes);
+        ILI9488_WriteDataDMA(line_buffer, line_size_bytes);
     }
 
     // 7. Limpeza
@@ -294,5 +306,77 @@ uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, co
          return 0; // Leitura falhou
     }
 
+    return 1; // Sucesso
+}
+
+uint8_t ILI9488_DrawImage_Transparent(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath) {
+    FIL file;
+    FRESULT res;
+    UINT br = 0; // Bytes lidos
+    
+    // 1. Verifica limites
+    if ((x >= ILI9488_WIDTH) || (y >= ILI9488_HEIGHT)) return 0;
+    // Ajuste de cortes
+    if ((x + w) > ILI9488_WIDTH) w = ILI9488_WIDTH - x;
+    if ((y + h) > ILI9488_HEIGHT) h = ILI9488_HEIGHT - y;
+
+    // 2. Calcula tamanho da linha (RGB888 = 3 bytes/pixel)
+    uint32_t line_size_bytes = (uint32_t)w * 3;
+
+    // 3. Aloca um buffer na STACK para a linha (VLA - Variável de Tamanho Variável)
+    // Atenção: Confirme o ajuste de Stack_Size para a maior imagem
+    uint8_t line_buffer[line_size_bytes]; 
+
+    // 4. Abre o arquivo
+    res = f_open(&file, filepath, FA_READ);
+    if (res != FR_OK) {
+        return 0; // Falha ao abrir o arquivo
+    }
+
+    ILI9488_Select();
+
+    // Loop de leitura e desenho
+    for (uint16_t i = 0; i < h; i++) { // i é a linha (y)
+        // Lê uma linha do arquivo
+        res = f_read(&file, line_buffer, line_size_bytes, &br);
+        
+        if (res != FR_OK || br < line_size_bytes) {
+            break; // Fim de arquivo ou erro de leitura
+        }
+
+        uint8_t *p = line_buffer;
+        
+        // Processa pixel por pixel
+        for (uint16_t j = 0; j < w; j++) { // j é a coluna (x)
+            uint8_t r = *p++;
+            uint8_t g = *p++;
+            uint8_t b = *p++;
+
+            // Verifica a Cor Chave (Transparência)
+            if (r != ILI9488_COLOR_KEY_R || g != ILI9488_COLOR_KEY_G || b != ILI9488_COLOR_KEY_B) {
+                // Pixel opaco: desenha o pixel
+                
+                // Configura a janela de endereço para APENAS este pixel (x, y)
+                // Isto garante que apenas o pixel opaco seja desenhado
+                ILI9488_SetAddressWindow(x + j, y + i, x + j, y + i);
+                
+                // Envia os 3 bytes R, G, B
+                uint8_t data[] = {r, g, b};
+                ILI9488_WriteData(data, sizeof(data));
+                // Nota: O ILI9488_WriteData envia os 3 bytes e volta para o modo Data.
+                // Na próxima iteração, o SetAddressWindow para o próximo pixel será chamado.
+            }
+            // Se for Cor Chave, apenas o ponteiro avança, pulando a escrita no display.
+        }
+    }
+
+    // 7. Limpeza
+    ILI9488_Unselect();
+    f_close(&file);
+
+    // 8. Retorno
+    if (br != line_size_bytes && h > 0) {
+         return 0; // Leitura falhou
+    }
     return 1; // Sucesso
 }

@@ -47,6 +47,11 @@ extern SPI_HandleTypeDef ILI9488_SPI_PORT;
 #define ILI9488_BROWN   0x51E0
 #define ILI9488_GRAY    0x630C
 
+// Cor Chave para Transparência (Magenta Pura em RGB888)
+#define ILI9488_COLOR_KEY_R 0xFF // 255
+#define ILI9488_COLOR_KEY_G 0x00 // 0
+#define ILI9488_COLOR_KEY_B 0xFF // 255
+
 // Protótipos das Funções
 void ILI9488_Unselect();
 void ILI9488_Init(void);
@@ -57,4 +62,6 @@ void ILI9488_FillScreen(uint16_t color);
 void ILI9488_DrawImage_RGB666(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t* data);
 void ILI9488_InvertColors(bool invert);
 uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath);
+uint8_t ILI9488_DrawImage_Transparent(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath);
+
 #endif // __ILI9488_H__

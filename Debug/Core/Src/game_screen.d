@@ -33,7 +33,7 @@ Core/Src/game_screen.o: ../Core/Src/game_screen.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/fonts.h
+ ../Core/Inc/fonts.h ../Core/Inc/main.h
 ../Core/Inc/game_screen.h:
 ../Core/Inc/ILI9488.h:
 ../Core/Inc/fonts.h:
@@ -72,3 +72,4 @@ Core/Src/game_screen.o: ../Core/Src/game_screen.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 ../Core/Inc/fonts.h:
+../Core/Inc/main.h:

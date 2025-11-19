@@ -63,11 +63,12 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart4;
 DMA_HandleTypeDef hdma_sdio_rx;
 DMA_HandleTypeDef hdma_sdio_tx;
-
+DMA_HandleTypeDef hdma_spi1_tx;
 osThreadId inputHalTaskHandle;
 osThreadId gameTaskHandle;
 osThreadId displayTaskHandle; 
 osMutexId gameMutexHandle;   
+osSemaphoreId spiTxSemaHandle;
 
 volatile char keyPressed = '\0';
 volatile EGameStates eCurrentState = eInitGame;
@@ -81,6 +82,7 @@ volatile uint8_t u8ContAttack = 0;
 volatile uint8_t sdCardMounted = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
+extern volatile bool spi_transfer_complete;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -204,7 +206,8 @@ int main(void)
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+  osSemaphoreDef(spiTxSema);
+  spiTxSemaHandle = osSemaphoreCreate(osSemaphore(spiTxSema), 1);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -445,6 +448,8 @@ static void MX_DMA_Init(void)
   HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
 
+  HAL_NVIC_SetPriority(DMA2_Stream5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
 }
 
 /**
@@ -796,7 +801,7 @@ void StartDisplayTask(void const * argument)
           {
             if (sdCardMounted) {
                 // Tenta ler do SD
-                if (!ILI9488_DrawImage_BIN(100, 100, 30, 30, "0:/fire30.bin")) {
+                if (!ILI9488_DrawImage_BIN(0, 0, 480, 320, "0:/bgm.bin")) {
                     ILI9488_WriteString(0, 10, "Falha ao ler background.bin", Font_7x10, ILI9488_RED, ILI9488_BLACK);
                 }
             } else {
@@ -808,7 +813,7 @@ void StartDisplayTask(void const * argument)
           case eDificultSelect:
           {
             // Agora, esta função será chamada com o 'selectedOption' ATUALIZADO
-            DrawMenu("Selecione Dificuldade", difficultyOptions, MENU_OPTIONS_DIFFICULTY, selectedOption);
+            DrawDifficultyMenu(selectedOption);
             break;
           }
           case ePersonaSelect:
@@ -940,6 +945,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE END Callback 1 */
 }
 
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+    // Verifica se a interrupção é do SPI do display
+    if(hspi->Instance == hspi1.Instance) {
+        // Libera o semáforo/notificação no contexto de interrupção
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(spiTxSemaHandle, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
