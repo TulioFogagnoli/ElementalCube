@@ -23,5 +23,5 @@ extern const DifficultyOptionData_t DIFFICULTY_DATA[];
 void ClearScreen();
 void DrawMenu(const char* title, const char** options, int numOptions, int currentSelection);
 void DrawDifficultyMenu(int currentSelection);
-
+void DrawSingleDifficultyOption(int index, int isSelected);
 #endif //GAME_SCREEN_H

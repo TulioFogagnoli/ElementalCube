@@ -76,3 +76,34 @@ void DrawDifficultyMenu(int currentSelection) {
         }
     }
 }
+
+void DrawSingleDifficultyOption(int index, int isSelected) {
+    const DifficultyOptionData_t* option = &DIFFICULTY_DATA[index];
+    char buffer[30];
+
+    if (isSelected) {
+        // --- DESENHANDO O GRANDE (SELECIONADO) ---
+        // Calcula posição centralizada
+        uint16_t x = option->x_norm - ((option->w_sel - option->w_norm) / 2);
+        uint16_t y = option->y_norm - ((option->h_sel - option->h_norm) / 2);
+        
+        // Desenha a imagem Grande transparente por cima do que estiver lá
+        if (!ILI9488_DrawImage_Transparent(x, y, option->w_sel, option->h_sel, option->sel_path)) {
+             // Tratamento de erro...
+        }
+
+    } else {
+        // --- DESENHANDO O PEQUENO (NORMAL) ---
+        
+        // 1. A "Borracha": Restaurar o background na área onde estava o botão GRANDE
+        //    Calculamos a área do botão grande (selecionado) para este índice
+        uint16_t x_sel = option->x_norm - ((option->w_sel - option->w_norm) / 2);
+        uint16_t y_sel = option->y_norm - ((option->h_sel - option->h_norm) / 2);
+        
+        //    Chama a função para "pintar" o background original nessa área
+        ILI9488_RestoreRect(x_sel, y_sel, option->w_sel, option->h_sel, "0:/bgd.bin");
+        
+        // 2. Agora que a área está limpa (tem o fundo original), desenhamos o botão pequeno
+        ILI9488_DrawImage_Transparent(option->x_norm, option->y_norm, option->w_norm, option->h_norm, option->norm_path);
+    }
+}

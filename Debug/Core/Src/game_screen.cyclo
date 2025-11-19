@@ -1,3 +1,4 @@
 ../Core/Src/game_screen.c:13:6:ClearScreen	1
 ../Core/Src/game_screen.c:17:6:DrawMenu	4
 ../Core/Src/game_screen.c:33:6:DrawDifficultyMenu	4
+../Core/Src/game_screen.c:80:6:DrawSingleDifficultyOption	2

@@ -15,4 +15,5 @@
 ../Core/Src/ILI9488.c:218:6:ILI9488_DrawImage_RGB666	6
 ../Core/Src/ILI9488.c:240:6:ILI9488_InvertColors	2
 ../Core/Src/ILI9488.c:257:9:ILI9488_DrawImage_BIN	11
-../Core/Src/ILI9488.c:312:9:ILI9488_DrawImage_Transparent	15
+../Core/Src/ILI9488.c:312:9:ILI9488_DrawImage_Transparent	17
+../Core/Src/ILI9488.c:388:9:ILI9488_RestoreRect	9

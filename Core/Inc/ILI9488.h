@@ -63,5 +63,6 @@ void ILI9488_DrawImage_RGB666(uint16_t x, uint16_t y, uint16_t w, uint16_t h, co
 void ILI9488_InvertColors(bool invert);
 uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath);
 uint8_t ILI9488_DrawImage_Transparent(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath);
+uint8_t ILI9488_RestoreRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath);
 
 #endif // __ILI9488_H__

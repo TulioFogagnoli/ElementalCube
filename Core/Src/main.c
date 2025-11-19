@@ -383,7 +383,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -572,13 +572,11 @@ void StartGameTask(void const * argument)
             case UP_KEY:
             {
               selectedOption = (selectedOption < MENU_OPTIONS_DIFFICULTY - 1) ? selectedOption + 1 : 0;
-              u8CleanScreen = TRUE;
               break;
   }
             case DOWN_KEY:
             {
               selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_DIFFICULTY - 1;
-              u8CleanScreen = TRUE;
               break;
             }
             case BACK_KEY:
@@ -734,7 +732,7 @@ void StartDisplayTask(void const * argument)
 {
   /* USER CODE BEGIN StartDisplayTask */
   char buffer[30];
-  // uint8_t u8RedrawScreen = FALSE; // Não precisamos mais desta variável local
+  static int lastSelectedOption = -1;
   EGameStates ePreviousState = eInitGame;
 
   FRESULT fres;
@@ -785,7 +783,7 @@ void StartDisplayTask(void const * argument)
     {
       // Limpa a tela
       ClearScreen(); 
-
+      lastSelectedOption = selectedOption;    
       // --- Reseta a flag ---
       // Já que vamos redesenhar, precisamos zerar a flag.
       if (bNeedsRedraw == TRUE) {
@@ -890,7 +888,19 @@ void StartDisplayTask(void const * argument)
       }
       ePreviousState = eLocalCurrentState;    
     }
+    else if (eLocalCurrentState == eDificultSelect && selectedOption != lastSelectedOption)
+    {
+        // 1. O botão que ERA selecionado volta ao normal (Pequeno)
+        if (lastSelectedOption != -1) {
+            DrawSingleDifficultyOption(lastSelectedOption, FALSE); // FALSE = Normal
+        }
 
+        // 2. O NOVO botão selecionado fica grande
+        DrawSingleDifficultyOption(selectedOption, TRUE); // TRUE = Selecionado
+
+        // 3. Atualiza a memória
+        lastSelectedOption = selectedOption;
+    }
     // Esta parte (atualização em tempo real dos sensores) está correta e
     // deve ficar FORA do 'if' de redesenho principal.
     if (eLocalCurrentState == eBattleInit)

@@ -310,73 +310,137 @@ uint8_t ILI9488_DrawImage_BIN(uint16_t x, uint16_t y, uint16_t w, uint16_t h, co
 }
 
 uint8_t ILI9488_DrawImage_Transparent(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath) {
-    FIL file;
+FIL file;
     FRESULT res;
-    UINT br = 0; // Bytes lidos
-    
-    // 1. Verifica limites
+    UINT br = 0;
+
+    // 1. Verificações de limites
     if ((x >= ILI9488_WIDTH) || (y >= ILI9488_HEIGHT)) return 0;
-    // Ajuste de cortes
     if ((x + w) > ILI9488_WIDTH) w = ILI9488_WIDTH - x;
     if ((y + h) > ILI9488_HEIGHT) h = ILI9488_HEIGHT - y;
 
-    // 2. Calcula tamanho da linha (RGB888 = 3 bytes/pixel)
+    // 2. Prepara Buffer de Linha
     uint32_t line_size_bytes = (uint32_t)w * 3;
-
-    // 3. Aloca um buffer na STACK para a linha (VLA - Variável de Tamanho Variável)
-    // Atenção: Confirme o ajuste de Stack_Size para a maior imagem
+    // VLA (Variable Length Array) na stack. Se der estouro, use static ou malloc.
     uint8_t line_buffer[line_size_bytes]; 
 
-    // 4. Abre o arquivo
+    // 3. Abre Arquivo
     res = f_open(&file, filepath, FA_READ);
-    if (res != FR_OK) {
-        return 0; // Falha ao abrir o arquivo
-    }
+    if (res != FR_OK) return 0;
 
     ILI9488_Select();
 
-    // Loop de leitura e desenho
-    for (uint16_t i = 0; i < h; i++) { // i é a linha (y)
-        // Lê uma linha do arquivo
+    // 4. Loop Linha por Linha (Y)
+    for (uint16_t i = 0; i < h; i++) {
+        
+        // Lê a linha inteira do SD para o buffer
         res = f_read(&file, line_buffer, line_size_bytes, &br);
-        
-        if (res != FR_OK || br < line_size_bytes) {
-            break; // Fim de arquivo ou erro de leitura
-        }
+        if (res != FR_OK || br < line_size_bytes) break;
 
-        uint8_t *p = line_buffer;
-        
-        // Processa pixel por pixel
-        for (uint16_t j = 0; j < w; j++) { // j é a coluna (x)
-            uint8_t r = *p++;
-            uint8_t g = *p++;
-            uint8_t b = *p++;
-
-            // Verifica a Cor Chave (Transparência)
-            if (r != ILI9488_COLOR_KEY_R || g != ILI9488_COLOR_KEY_G || b != ILI9488_COLOR_KEY_B) {
-                // Pixel opaco: desenha o pixel
+        // Processa a linha horizontalmente (X) procurando BLOCOS de pixels opacos
+        for (uint16_t j = 0; j < w; j++) {
+            
+            uint8_t* p_pixel = &line_buffer[j * 3];
+            
+            // Verifica se é a Cor Chave (Magenta: 0xFF, 0x00, 0xFF)
+            if (p_pixel[0] == ILI9488_COLOR_KEY_R && 
+                p_pixel[1] == ILI9488_COLOR_KEY_G && 
+                p_pixel[2] == ILI9488_COLOR_KEY_B) {
+                // É transparente: Pula este pixel e continua o loop
+                continue; 
+            } 
+            
+            // SE É OPACO: Calcula o tamanho do bloco contínuo (run_len)
+            uint16_t run_len = 1;
+            while ((j + run_len) < w) {
+                uint8_t* p_next = &line_buffer[(j + run_len) * 3];
                 
-                // Configura a janela de endereço para APENAS este pixel (x, y)
-                // Isto garante que apenas o pixel opaco seja desenhado
-                ILI9488_SetAddressWindow(x + j, y + i, x + j, y + i);
-                
-                // Envia os 3 bytes R, G, B
-                uint8_t data[] = {r, g, b};
-                ILI9488_WriteData(data, sizeof(data));
-                // Nota: O ILI9488_WriteData envia os 3 bytes e volta para o modo Data.
-                // Na próxima iteração, o SetAddressWindow para o próximo pixel será chamado.
+                // Se encontrar um pixel transparente, o bloco acaba.
+                if (p_next[0] == ILI9488_COLOR_KEY_R && 
+                    p_next[1] == ILI9488_COLOR_KEY_G && 
+                    p_next[2] == ILI9488_COLOR_KEY_B) {
+                    break;
+                }
+                run_len++;
             }
-            // Se for Cor Chave, apenas o ponteiro avança, pulando a escrita no display.
+
+            // DESENHA O BLOCO OPACO
+            // 1. Define a janela para o tamanho exato do bloco (run_len pixels)
+            ILI9488_SetAddressWindow(x + j, y + i, x + j + run_len - 1, y + i);
+            
+            // 2. Envia os dados usando sua função DMA encapsulada
+            // Passamos o ponteiro do início do bloco e o tamanho total em bytes
+            ILI9488_WriteDataDMA(p_pixel, run_len * 3);
+            
+            // 3. Avança o índice 'j' para pular os pixels que já enviamos neste bloco
+            j += (run_len - 1); 
         }
     }
 
-    // 7. Limpeza
     ILI9488_Unselect();
     f_close(&file);
+    return 1;
+}
 
-    // 8. Retorno
-    if (br != line_size_bytes && h > 0) {
-         return 0; // Leitura falhou
+// ILI9488.c
+
+// Restaura uma área retangular da tela usando pixels do arquivo de background (480x320)
+uint8_t ILI9488_RestoreRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* filepath) {
+    FIL file;
+    FRESULT res;
+    UINT br;
+
+    // 1. Verifica limites
+    if ((x >= ILI9488_WIDTH) || (y >= ILI9488_HEIGHT)) return 0;
+    if ((x + w) > ILI9488_WIDTH) w = ILI9488_WIDTH - x;
+    if ((y + h) > ILI9488_HEIGHT) h = ILI9488_HEIGHT - y;
+
+    // 2. Abre o arquivo de background
+    res = f_open(&file, filepath, FA_READ);
+    if (res != FR_OK) return 0;
+
+    // 3. Preparações
+    uint32_t full_image_width = 480; // Largura original do bgm.bin
+    uint32_t bytes_per_pixel = 3;
+    
+    // Buffer para ler uma linha do RECORTE
+    uint32_t line_size = w * bytes_per_pixel;
+    uint8_t line_buffer[line_size];
+
+    ILI9488_Select();
+
+    // Define a janela de escrita no display para o tamanho do recorte
+    ILI9488_SetAddressWindow(x, y, x + w - 1, y + h - 1);
+
+    // Envia o comando de escrita de memória UMA vez antes do loop
+    HAL_GPIO_WritePin(ILI9488_DC_GPIO_Port, ILI9488_DC_Pin, GPIO_PIN_RESET);
+    uint8_t cmd = 0x2C;
+    HAL_SPI_Transmit(&ILI9488_SPI_PORT, &cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(ILI9488_DC_GPIO_Port, ILI9488_DC_Pin, GPIO_PIN_SET);
+
+    // 4. Loop Linha por Linha
+    for (uint16_t i = 0; i < h; i++) {
+        
+        // Calcula onde começa esta linha específica dentro do arquivo bgm.bin
+        // Offset = (Linha Atual Y * Largura Total * 3) + (Coluna Inicial X * 3)
+        uint32_t file_offset = ((y + i) * full_image_width * bytes_per_pixel) + (x * bytes_per_pixel);
+        
+        // Move o cursor do arquivo para o ponto exato
+        f_lseek(&file, file_offset);
+        
+        // Lê apenas a largura do recorte
+        res = f_read(&file, line_buffer, line_size, &br);
+        if (res != FR_OK || br < line_size) break;
+
+        // Envia para o display (pode usar a função DMA ou Síncrona aqui)
+        // Como estamos com f_lseek, DMA pode não ser tão vantajoso, mas vamos usar para manter o padrão
+        // Se der erro, troque por HAL_SPI_Transmit
+        osSemaphoreWait(spiTxSemaHandle, 0); // Limpa semáforo
+        HAL_SPI_Transmit_DMA(&ILI9488_SPI_PORT, line_buffer, line_size);
+        osSemaphoreWait(spiTxSemaHandle, osWaitForever); // Espera terminar
     }
-    return 1; // Sucesso
+
+    ILI9488_Unselect();
+    f_close(&file);
+    return 1;
 }

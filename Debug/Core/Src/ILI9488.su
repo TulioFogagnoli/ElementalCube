@@ -16,3 +16,4 @@
 ../Core/Src/ILI9488.c:240:6:ILI9488_InvertColors	16	static
 ../Core/Src/ILI9488.c:257:9:ILI9488_DrawImage_BIN	624	dynamic
 ../Core/Src/ILI9488.c:312:9:ILI9488_DrawImage_Transparent	640	dynamic
+../Core/Src/ILI9488.c:388:9:ILI9488_RestoreRect	640	dynamic

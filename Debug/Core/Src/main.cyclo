@@ -8,7 +8,7 @@
 ../Core/Src/main.c:460:13:MX_GPIO_Init	1
 ../Core/Src/main.c:518:6:StartInputHalTask	3
 ../Core/Src/main.c:537:6:StartGameTask	31
-../Core/Src/main.c:733:6:StartDisplayTask	37
-../Core/Src/main.c:934:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:948:6:HAL_SPI_TxCpltCallback	3
-../Core/Src/main.c:961:6:Error_Handler	1
+../Core/Src/main.c:731:6:StartDisplayTask	40
+../Core/Src/main.c:944:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:958:6:HAL_SPI_TxCpltCallback	3
+../Core/Src/main.c:971:6:Error_Handler	1
