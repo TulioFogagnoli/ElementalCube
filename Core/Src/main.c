@@ -846,7 +846,10 @@ void StartDisplayTask(void const * argument)
           }
           case ePersonaSelect:
           {
-
+            if (bNeedsRedraw) {
+              ILI9488_DrawImage_BIN(0, 0, 480, 320, "0:/bgp.bin");
+            }
+            
             DrawPersonaCarousel(selectedOption);
             lastSelectedPersona = selectedOption;
             break;
