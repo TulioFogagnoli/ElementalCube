@@ -1,4 +1,8 @@
-../Core/Src/game_screen.c:13:6:ClearScreen	16	static
-../Core/Src/game_screen.c:17:6:DrawMenu	80	static
-../Core/Src/game_screen.c:33:6:DrawDifficultyMenu	96	static
-../Core/Src/game_screen.c:80:6:DrawSingleDifficultyOption	80	static
+../Core/Src/game_screen.c:50:6:ClearScreen	16	static
+../Core/Src/game_screen.c:54:6:DrawCachedPlayerIcon	24	static
+../Core/Src/game_screen.c:63:6:DrawDifficultyMenu	96	static
+../Core/Src/game_screen.c:95:6:DrawSingleDifficultyOption	48	static
+../Core/Src/game_screen.c:117:6:DrawPersonaCarousel	32	static
+../Core/Src/game_screen.c:142:9:LoadAllIconsToCache	576	static
+../Core/Src/game_screen.c:159:6:DrawBattleLayout	56	static
+../Core/Src/game_screen.c:192:6:UpdatePlayerAttacks	32	static

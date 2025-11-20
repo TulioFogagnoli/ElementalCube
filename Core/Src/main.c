@@ -624,23 +624,46 @@ void StartGameTask(void const * argument)
             }
             case CONFIRM_KEY:
             {
-              eUserPlayer.ePersonaElemental = (EElemental)selectedOption;
+              eUserPlayer.ePersonaElemental = (EElemental)selectedOption; 
+              
+              // Agora sim mudamos de estado
               eCurrentState = eBattleInit;
               u8CleanScreen = TRUE;
-              u8ContAttack = 0;     // Zera o contador de ataques
-              selectedOption = 0;   // Inicia com a primeira opção (Fogo) pré-selecionada
+              u8ContAttack = 0;
+              selectedOption = 0;
 
               memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
               memset((void*)eCpuPlayer.eAttackSequential, 0, sizeof(eCpuPlayer.eAttackSequential));
 
               srand(HAL_GetTick()); 
-              eCpuPlayer.ePersonaElemental = (rand() % 6);
+              
+              // 🛑 NOVA LÓGICA DE ESCOLHA DA PERSONA DA CPU (Baseado na Dificuldade)
+              uint8_t u8RandRange = 0;
+              uint8_t u8RandMin = 0;
+              
+              if (selectedDifficulty == eDificultEasy) {
+                  // Fácil: Apenas Fogo (0) ou Água (1). Range [0, 1]
+                  u8RandRange = 2; // (1 - 0) + 1 = 2
+                  u8RandMin = 0;
+              } else if (selectedDifficulty == eDificultMedium) {
+                  // Médio: Fogo (0) a Ar (3). Range [0, 3]
+                  u8RandRange = 4; // (3 - 0) + 1 = 4
+                  u8RandMin = 0;
+              } else { // Difícil (eHard)
+                  // Difícil: Apenas Luz (4) ou Sombra (5). Range [4, 5]
+                  u8RandRange = 2; // (5 - 4) + 1 = 2
+                  u8RandMin = 4;
+              }
+              
+              // Gera o índice aleatório dentro do range e ajusta pelo mínimo
+              eCpuPlayer.ePersonaElemental = (EElemental)((rand() % u8RandRange) + u8RandMin);
+
+              // ... (O restante da geração dos ataques da CPU permanece, mas deve usar a nova Persona Elemental para coerência se necessário)
               for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
               {
-                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6); 
+                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6); // Pode manter o ataque aleatório de 0-5
               }
-              break;
-            }
+              break;            }
             default:
             {
               break;
@@ -733,6 +756,7 @@ void StartDisplayTask(void const * argument)
   /* USER CODE BEGIN StartDisplayTask */
   char buffer[30];
   static int lastSelectedOption = -1;
+  static int lastSelectedPersona = -1;
   EGameStates ePreviousState = eInitGame;
 
   FRESULT fres;
@@ -760,6 +784,11 @@ void StartDisplayTask(void const * argument)
           ILI9488_WriteString(10, 25, "FR_NOT_READY", Font_7x10, ILI9488_RED, ILI9488_BLACK);
       }
   }
+  if (sdCardMounted) {
+    if(LoadAllIconsToCache()) {
+        ILI9488_WriteString(10,50,"Cache OK", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
+    }
+  }
 
   // A flag u8CleanScreen deve estar TRUE por padrão no início para forçar o primeiro desenho
   osMutexWait(gameMutexHandle, osWaitForever);
@@ -784,6 +813,7 @@ void StartDisplayTask(void const * argument)
       // Limpa a tela
       ClearScreen(); 
       lastSelectedOption = selectedOption;    
+      lastSelectedPersona = -1;
       // --- Reseta a flag ---
       // Já que vamos redesenhar, precisamos zerar a flag.
       if (bNeedsRedraw == TRUE) {
@@ -810,60 +840,28 @@ void StartDisplayTask(void const * argument)
           }
           case eDificultSelect:
           {
-            // Agora, esta função será chamada com o 'selectedOption' ATUALIZADO
+
             DrawDifficultyMenu(selectedOption);
             break;
           }
           case ePersonaSelect:
           {
-            // E aqui também
-            DrawMenu("Selecione Personagem", personaOptions, MENU_OPTIONS_PERSONA, selectedOption);
+
+            DrawPersonaCarousel(selectedOption);
+            lastSelectedPersona = selectedOption;
             break;
           }
           case eBattleInit:
           {
-            ILI9488_WriteString(10, 15, "Prepare seus ataques!", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            ILI9488_WriteString(10, 35, "Posicione os 4 cubos e pressione *", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
-            for (int i = 0; i < 4; i++) {
-              sprintf(buffer, "Sensor %d:", i + 1);
-              ILI9488_WriteString(20, 80 + (i * 30), buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-              }
+            DrawBattleLayout(selectedDifficulty, &eUserPlayer, &eCpuPlayer); 
+    
+            // Muda o estado "anterior" para evitar redesenho do layout
+            ePreviousState = eLocalCurrentState;
             break;
           }
           case ePlayerTurn:
           {
-            ILI9488_WriteString(10, 20, "Resultado do Round", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            sprintf(buffer, "Sua Vida: %d", eUserPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 60, buffer, Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-            sprintf(buffer, "Vida CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 90, buffer, Font_7x10, ILI9488_RED, ILI9488_BLACK);
-            ILI9488_WriteString(10, 130, "Seus Ataques:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
-                uint16_t attackColor = ILI9488_WHITE;
-                switch(eUserPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9488_RED;   break;
-                    case eBlue:   attackColor = ILI9488_BLUE;  break;
-                    case eGreen:  attackColor = ILI9488_CYAN;  break;
-                    case eYellow: attackColor = ILI9488_BROWN; break;
-                    case eWhite:  attackColor = ILI9488_WHITE; break;
-                    case eBlack:  attackColor = ILI9488_GRAY;  break;
-                }
-                ILI9488_FillRectangle(10 + (i * 30), 150, 20, 20, attackColor);
-            }
-            ILI9488_WriteString(10, 190, "Ataques CPU:", Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            for(uint8_t i = 0; i < ATTACKS_NUMBERS; i++) {
-                uint16_t attackColor = ILI9488_WHITE;
-                switch(eCpuPlayer.eAttackSequential[i]) {
-                    case eRed:    attackColor = ILI9488_RED;   break;
-                    case eBlue:   attackColor = ILI9488_BLUE;  break;
-                    case eGreen:  attackColor = ILI9488_CYAN;  break;
-                    case eYellow: attackColor = ILI9488_BROWN; break;
-                    case eWhite:  attackColor = ILI9488_WHITE; break;
-                    case eBlack:  attackColor = ILI9488_GRAY;  break;
-                }
-                ILI9488_FillRectangle(10 + (i * 30), 210, 20, 20, attackColor);
-            }
-            ILI9488_WriteString(10, 280, "Pressione * para continuar...", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
+            UpdatePlayerAttacks(&eUserPlayer);
             break;
           }
           case eEndGame:
@@ -901,36 +899,37 @@ void StartDisplayTask(void const * argument)
         // 3. Atualiza a memória
         lastSelectedOption = selectedOption;
     }
-    // Esta parte (atualização em tempo real dos sensores) está correta e
-    // deve ficar FORA do 'if' de redesenho principal.
-    if (eLocalCurrentState == eBattleInit)
+    else if (eLocalCurrentState == ePersonaSelect && selectedOption != lastSelectedPersona)
     {
-        for (int i = 0; i < 4; i++) {
-            EColor detectedColor = TCS3472_DetectColor(colorData[i]);
-            uint16_t colorBox = ILI9488_BLACK;
-            char colorName[10] = "Vazio";
-
-            switch(detectedColor) {
-                case eRed:    colorBox = ILI9488_RED;   strcpy(colorName, "Fogo");   break;
-                case eBlue:   colorBox = ILI9488_BLUE;  strcpy(colorName, "Agua");   break;
-                case eGreen:  colorBox = ILI9488_CYAN;  strcpy(colorName, "Ar");     break;
-                case eYellow: colorBox = ILI9488_BROWN; strcpy(colorName, "Terra");  break;
-                case eWhite:  colorBox = ILI9488_WHITE; strcpy(colorName, "Luz?");   break;
-                default: break;
-            }
-
-            // APAGA a área do nome da cor antiga desenhando um retângulo preto por cima
-            ILI9488_FillRectangle(100, 80 + (i * 30), 45, 10, ILI9488_BLACK);
-            // Escreve o novo nome da cor
-            ILI9488_WriteString(100, 80 + (i * 30), colorName, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            // Redesenha o quadrado colorido
-            ILI9488_FillRectangle(150, 75 + (i * 30), 20, 20, colorBox);
-        }
+        // A seleção mudou! O carrossel precisa girar.
+        // A função DrawPersonaCarousel já cuida de limpar as áreas e desenhar as novas posições.
+        DrawPersonaCarousel(selectedOption);
+        
+        lastSelectedPersona = selectedOption;
     }
+    if (eLocalCurrentState == eBattleInit)
+      {
+          // 1. Ler sensores e atualizar a estrutura do jogador em tempo real
+          // Isso permite que UpdatePlayerAttacks saiba o que desenhar
+          for (int i = 0; i < ATTACKS_NUMBERS; i++) {
+              // Converte a leitura do sensor para o Enum de cor do jogo
+              EColor detectedColor = TCS3472_DetectColor(colorData[i]);
+              
+              // Atualiza a estrutura volante (usada apenas para visualização neste momento)
+              eUserPlayer.eAttackSequential[i] = detectedColor;
+          }
 
-    osDelay(10); // Reduzido de HAL_Delay para osDelay para ser RTOS-friendly
-  }
-  /* USER CODE END StartDisplayTask */
+          // 2. Desenhar os ícones (Sprites 70x70) baseados nos sensores
+          // Esta função já cuida de desenhar o ícone ou restaurar o fundo se for vazio
+          UpdatePlayerAttacks(&eUserPlayer);
+      }
+      
+      // A atualização dos debugs (retângulos coloridos e texto) foi removida
+      // pois ela desenhava POR CIMA dos ícones do jogo.
+
+      osDelay(10); // Delay para não travar a CPU
+    }
+    /* USER CODE END StartDisplayTask */
 }
 
 /**

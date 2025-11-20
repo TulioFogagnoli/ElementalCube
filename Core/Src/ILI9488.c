@@ -444,3 +444,60 @@ uint8_t ILI9488_RestoreRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, cons
     f_close(&file);
     return 1;
 }
+
+uint8_t ILI9488_DrawCachedSprite_Transparent(uint16_t x_start, uint16_t y_start, uint16_t w, uint16_t h, const uint8_t* pData) {
+    
+    // 1. Verificações de limites
+    if ((x_start >= ILI9488_WIDTH) || (y_start >= ILI9488_HEIGHT)) return 0;
+    
+    // Ajustes simples de recorte (clipping)
+    uint16_t draw_w = w;
+    uint16_t draw_h = h;
+    if ((x_start + w) > ILI9488_WIDTH) draw_w = ILI9488_WIDTH - x_start;
+    if ((y_start + h) > ILI9488_HEIGHT) draw_h = ILI9488_HEIGHT - y_start;
+
+    uint32_t line_stride = w * 3; // Tamanho real de uma linha na imagem original
+
+    ILI9488_Select();
+
+    // 2. Loop Linha por Linha (Y)
+    for (uint16_t i = 0; i < draw_h; i++) {
+        
+        // Ponteiro para o início da linha atual dentro do buffer da RAM
+        const uint8_t* p_line_start = pData + (i * line_stride);
+
+        // Processa a linha horizontalmente (X)
+        for (uint16_t j = 0; j < draw_w; j++) {
+            
+            const uint8_t* p_pixel = p_line_start + (j * 3);
+            
+            // Verifica Cor Chave (Magenta: 0xFF, 0x00, 0xFF)
+            if (p_pixel[0] == 0xFF && p_pixel[1] == 0x00 && p_pixel[2] == 0xFF) {
+                continue; // Pula pixel transparente
+            } 
+            
+            // É OPACO: Calcula tamanho do bloco contínuo (run_len)
+            uint16_t run_len = 1;
+            while ((j + run_len) < draw_w) {
+                const uint8_t* p_next = p_line_start + ((j + run_len) * 3);
+                if (p_next[0] == 0xFF && p_next[1] == 0x00 && p_next[2] == 0xFF) {
+                    break; // Fim do bloco opaco
+                }
+                run_len++;
+            }
+
+            // DESENHA O BLOCO
+            ILI9488_SetAddressWindow(x_start + j, y_start + i, x_start + j + run_len - 1, y_start + i);
+            
+            // Envia via DMA (usando sua função encapsulada com semáforo)
+            // Precisamos fazer um cast para (uint8_t*) pois pData é const
+            ILI9488_WriteDataDMA((uint8_t*)p_pixel, run_len * 3);
+            
+            // Avança o índice
+            j += (run_len - 1); 
+        }
+    }
+
+    ILI9488_Unselect();
+    return 1;
+}
