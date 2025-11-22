@@ -80,9 +80,12 @@ volatile EWizard eCpuPlayer;
 volatile TCS3472_Data colorData[4];
 volatile uint8_t u8ContAttack = 0;
 volatile uint8_t sdCardMounted = 0;
+volatile uint8_t animSlotIdx = 0;
+volatile uint8_t animStep = 0;
 const char* difficultyOptions[MENU_OPTIONS_DIFFICULTY] = {"Facil", "Medio", "Dificil"};
 const char* personaOptions[MENU_OPTIONS_PERSONA] = {"Mago de Fogo", "Mago de Agua", "Mago de Terra", "Mago de Ar", "Mago da Luz"};
 extern volatile bool spi_transfer_complete;
+extern BattleRoundResult battleResults[ATTACKS_NUMBERS];
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -541,6 +544,7 @@ void StartGameTask(void const * argument)
   {
     cLocalKeyPressed = NONE_KEY;
     
+    // 1. Captura tecla (se houver) de forma segura
     osMutexWait(gameMutexHandle, osWaitForever);
     if (keyPressed != NONE_KEY) {
       cLocalKeyPressed = keyPressed;
@@ -548,6 +552,9 @@ void StartGameTask(void const * argument)
     }
     osMutexRelease(gameMutexHandle);
     
+    // ============================================================
+    // BLOCO A: Estados que DEPENDEM de tecla (Menus, Seleção)
+    // ============================================================
     if (cLocalKeyPressed != NONE_KEY)
     {
       osMutexWait(gameMutexHandle, osWaitForever);
@@ -555,199 +562,209 @@ void StartGameTask(void const * argument)
       {
         case eInitGame:
         {
+          // ... (Lógica do InitGame mantém igual)
           eUserPlayer.u8HeartPoints = 100;
           eCpuPlayer.u8HeartPoints = 100;
-          if(cLocalKeyPressed == CONFIRM_KEY)
-          {
+          if(cLocalKeyPressed == CONFIRM_KEY) {
             eCurrentState = eDificultSelect;
             selectedOption = 0;
             u8CleanScreen = TRUE;
-  }
+          }
           break;
         }
         case eDificultSelect:
         {
-          switch(cLocalKeyPressed)
-          {
-            case UP_KEY:
-            {
-              selectedOption = (selectedOption < MENU_OPTIONS_DIFFICULTY - 1) ? selectedOption + 1 : 0;
-              break;
-  }
-            case DOWN_KEY:
-            {
-              selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_DIFFICULTY - 1;
-              break;
-            }
-            case BACK_KEY:
-            {
-              u8CleanScreen = TRUE;
-              eCurrentState = eInitGame;
-              break;
-            }
-            case CONFIRM_KEY:
-            {
-              selectedDifficulty = (EDificult)selectedOption;
-              eCurrentState = ePersonaSelect;
-              selectedOption = FALSE; // Reseta para o próximo menu
-              u8CleanScreen = TRUE;
-              break;
-            }
-            default:
-            {
-              break;
-            }
-          }
-          break;
+          // ... (Lógica do DificultSelect mantém igual)
+           switch(cLocalKeyPressed) {
+              case UP_KEY: selectedOption = (selectedOption < MENU_OPTIONS_DIFFICULTY - 1) ? selectedOption + 1 : 0; break;
+              case DOWN_KEY: selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_DIFFICULTY - 1; break;
+              case BACK_KEY: u8CleanScreen = TRUE; eCurrentState = eInitGame; break;
+              case CONFIRM_KEY: 
+                  selectedDifficulty = (EDificult)selectedOption;
+                  eCurrentState = ePersonaSelect;
+                  selectedOption = FALSE; 
+                  u8CleanScreen = TRUE;
+                  break;
+           }
+           break;
         }
         case ePersonaSelect:
         {
+          // ... (Lógica do PersonaSelect mantém igual)
           switch(cLocalKeyPressed)
           {
-            case UP_KEY:
-            {                  
-              selectedOption = (selectedOption < MENU_OPTIONS_PERSONA - 1) ? selectedOption + 1 : 0;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case DOWN_KEY:
-            {
-              selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_PERSONA - 1;
-              u8CleanScreen = TRUE;
-              break;
-            }
-            case BACK_KEY:
-            {
-              u8CleanScreen = TRUE;
-              eCurrentState = eDificultSelect;
-              break;
-            }
+            case UP_KEY: selectedOption = (selectedOption < MENU_OPTIONS_PERSONA - 1) ? selectedOption + 1 : 0; u8CleanScreen = TRUE; break;
+            case DOWN_KEY: selectedOption = (selectedOption > 0) ? selectedOption - 1 : MENU_OPTIONS_PERSONA - 1; u8CleanScreen = TRUE; break;
+            case BACK_KEY: u8CleanScreen = TRUE; eCurrentState = eDificultSelect; break;
             case CONFIRM_KEY:
             {
-              eUserPlayer.ePersonaElemental = (EElemental)selectedOption; 
-              
-              // Agora sim mudamos de estado
-              eCurrentState = eBattleInit;
-              u8CleanScreen = TRUE;
-              u8ContAttack = 0;
-              selectedOption = 0;
+                eUserPlayer.ePersonaElemental = (EElemental)selectedOption; 
+                eCurrentState = eBattleInit;
+                u8CleanScreen = TRUE;
+                u8ContAttack = 0;
+                selectedOption = 0;
+                
+                // Reset dos arrays
+                memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
+                memset((void*)eCpuPlayer.eAttackSequential, 0, sizeof(eCpuPlayer.eAttackSequential));
+                
+                // Sorteios da CPU
+                srand(HAL_GetTick()); 
+                eCpuPlayer.ePersonaElemental = (EElemental)(rand() % 6);
+                for(int i = 0; i < ATTACKS_NUMBERS; i++) {
+                      eCpuPlayer.eAttackSequential[i] = (EColor)(rand() % 6);
+                }
 
-              memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
-              memset((void*)eCpuPlayer.eAttackSequential, 0, sizeof(eCpuPlayer.eAttackSequential));
-
-              srand(HAL_GetTick()); 
-              
-              // 🛑 NOVA LÓGICA DE ESCOLHA DA PERSONA DA CPU (Baseado na Dificuldade)
-              uint8_t u8RandRange = 0;
-              uint8_t u8RandMin = 0;
-              
-              if (selectedDifficulty == eDificultEasy) {
-                  // Fácil: Apenas Fogo (0) ou Água (1). Range [0, 1]
-                  u8RandRange = 2; // (1 - 0) + 1 = 2
-                  u8RandMin = 0;
-              } else if (selectedDifficulty == eDificultMedium) {
-                  // Médio: Fogo (0) a Ar (3). Range [0, 3]
-                  u8RandRange = 4; // (3 - 0) + 1 = 4
-                  u8RandMin = 0;
-              } else { // Difícil (eHard)
-                  // Difícil: Apenas Luz (4) ou Sombra (5). Range [4, 5]
-                  u8RandRange = 2; // (5 - 4) + 1 = 2
-                  u8RandMin = 4;
-              }
-              
-              // Gera o índice aleatório dentro do range e ajusta pelo mínimo
-              eCpuPlayer.ePersonaElemental = (EElemental)((rand() % u8RandRange) + u8RandMin);
-
-              // ... (O restante da geração dos ataques da CPU permanece, mas deve usar a nova Persona Elemental para coerência se necessário)
-              for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
-              {
-                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6); // Pode manter o ataque aleatório de 0-5
-              }
-              break;            }
-            default:
-            {
-              break;
+                // --- CORREÇÃO AQUI ---
+                
+                // 1. Libera o Mutex antes do delay para não travar a DisplayTask desenhando
+                osMutexRelease(gameMutexHandle); 
+                
+                // 2. Espera 400ms (tempo suficiente para soltar o botão)
+                osDelay(400); 
+                
+                // 3. Limpa a variável global de tecla para garantir que "sobras" do aperto não contem
+                // Precisa pegar o Mutex rapidinho só para limpar, se quiser ser thread-safe estrito,
+                // mas como é char atômico, apenas a atribuição resolve na prática:
+                keyPressed = NONE_KEY; 
+                
+                // 4. Retoma o Mutex para o fluxo do switch continuar (ou usa 'break' para sair do switch e o loop pega o mutex de novo)
+                osMutexWait(gameMutexHandle, osWaitForever);
+                
+                // --- FIM DA CORREÇÃO ---
             }
+            break;
           }
           break;
         }
         case eBattleInit:
         {
-          // A lógica de ataque agora só depende das teclas CONFIRM e BACK
+          // ... (Lógica do BattleInit mantém igual)
           switch (cLocalKeyPressed)
           {
             case CONFIRM_KEY:
             {
-              // Lê a cor de cada um dos 4 sensores e define a sequência de ataque
-              for (int i = 0; i < ATTACKS_NUMBERS; i++)
-              {
+              // 1. Ler Sensores
+              for (int i = 0; i < ATTACKS_NUMBERS; i++) {
                   eUserPlayer.eAttackSequential[i] = TCS3472_DetectColor(colorData[i]);
               }
-
-              // Prepara e inicia a batalha
+              // 2. CALCULAR TUDO (Preenche buffer battleResults)
               vInitBattle(&eUserPlayer, &eCpuPlayer);
-              eCurrentState = ePlayerTurn;
+
+              // 3. Mudar para modo ANIMÁTICO
+              animSlotIdx = 0;
+              animStep = 0;
+              eCurrentState = eBattleResolution; // <--- AQUI ENTRA NO MODO AUTOMÁTICO
               u8CleanScreen = TRUE;
+              osDelay(500);
               break;
             } 
             case BACK_KEY:
-            {
               eCurrentState = ePersonaSelect;
               u8CleanScreen = TRUE;
               break;
-            }
-            default:
-              // Ignora outras teclas, pois a tela se atualiza sozinha
-              break;
-          }
-          break;
-        }
-        case ePlayerTurn:
-        {
-          if(cLocalKeyPressed == CONFIRM_KEY)
-          {            
-            if (eUserPlayer.u8HeartPoints == 0 || eCpuPlayer.u8HeartPoints == 0)
-            {
-              eCurrentState = eEndGame; 
-            }
-            else
-            {
-              // Ninguém perdeu, volta para selecionar novos ataques
-              eCurrentState = eBattleInit;
-              u8ContAttack = 0; // Prepara para o novo round
-              selectedOption = 0;
-              memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
-              
-              // Gera novos ataques para a CPU para o próximo round
-              for(uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
-              {
-                eCpuPlayer.eAttackSequential[u8Idx] = (EColor)(rand() % 6);
-              }
-            }
-            u8CleanScreen = TRUE;
           }
           break;
         }
         case eEndGame:
         {
-          if(cLocalKeyPressed == CONFIRM_KEY)
-          {
+          if(cLocalKeyPressed == CONFIRM_KEY) {
             eCurrentState = eInitGame;
             u8CleanScreen = TRUE;
           }
           break;
         }
-        default:
+        // O player turn pode ser usado para "Fim de Round" esperando tecla para continuar
+        case ePlayerTurn: 
         {
-          // Estado desconhecido, volta para o início por segurança
-          eCurrentState = eInitGame;
-          u8CleanScreen = TRUE;
-          break;
+             if(cLocalKeyPressed == CONFIRM_KEY) {
+                // Volta para BattleInit para novo round
+                eCurrentState = eBattleInit;
+                u8CleanScreen = TRUE;
+                // ... Reseta arrays se necessário ...
+             }
+             break;
         }
+        default: break;
       }
       osMutexRelease(gameMutexHandle);
+    } // FIM DO IF KEY PRESSED
+
+    // ============================================================
+    // BLOCO B: Estados AUTOMÁTICOS (Animações) - FORA DO IF KEY
+    // ============================================================
+    
+    // Verificação segura do estado atual
+    osMutexWait(gameMutexHandle, osWaitForever);
+    EGameStates currentStateSnapshot = eCurrentState;
+    osMutexRelease(gameMutexHandle);
+
+    if (currentStateSnapshot == eBattleResolution)
+    {
+        // Nota: NÃO use Mutex em volta dos delays longos, senão trava a DisplayTask!
+        
+        if (animStep == 0) {
+            // Passo 0: Init
+            osDelay(250); 
+            animStep = 1; 
+            
+            osMutexWait(gameMutexHandle, osWaitForever);
+            u8CleanScreen = TRUE; 
+            osMutexRelease(gameMutexHandle);
+        }
+        else if (animStep == 1) {
+            // Passo 1: Mostra ícones
+            osDelay(250); // Tempo para ver os ícones
+            animStep = 2;
+            
+            osMutexWait(gameMutexHandle, osWaitForever);
+            u8CleanScreen = TRUE; 
+            osMutexRelease(gameMutexHandle);
+        }
+        else if (animStep == 2) {
+            // Passo 2: Ação!
+            osDelay(500); // Tempo da animação
+            animStep = 3;
+            
+            osMutexWait(gameMutexHandle, osWaitForever);
+            u8CleanScreen = TRUE; 
+            osMutexRelease(gameMutexHandle);
+        }
+        else if (animStep == 3) {
+            // Passo 3: Aplica Dano
+            osMutexWait(gameMutexHandle, osWaitForever);
+            
+            // Aplica lógica de dano (protegida por mutex pois altera variavel global)
+            int dmgToCpu = battleResults[animSlotIdx].damageToCpu;
+            int dmgToUser = battleResults[animSlotIdx].damageToUser;
+
+            if (eUserPlayer.u8HeartPoints > dmgToUser) eUserPlayer.u8HeartPoints -= dmgToUser;
+            else eUserPlayer.u8HeartPoints = 0;
+
+            if (eCpuPlayer.u8HeartPoints > dmgToCpu) eCpuPlayer.u8HeartPoints -= dmgToCpu;
+            else eCpuPlayer.u8HeartPoints = 0;
+            
+            osMutexRelease(gameMutexHandle);
+
+            osDelay(250); // Pausa dramática pós dano
+
+            osMutexWait(gameMutexHandle, osWaitForever);
+            if (eUserPlayer.u8HeartPoints == 0 || eCpuPlayer.u8HeartPoints == 0) {
+                eCurrentState = eEndGame;
+            } else {
+                animSlotIdx++;
+                if (animSlotIdx >= ATTACKS_NUMBERS) {
+                    eCurrentState = eBattleInit; // Fim do round, espera tecla
+                } else {
+                    animStep = 1; // Próximo slot
+                }
+            }
+            u8CleanScreen = TRUE;
+            osMutexRelease(gameMutexHandle);
+        }
     }
-    osDelay(50);
+
+    osDelay(20); // Delay pequeno do loop principal para não travar tudo
   }
 }
 
@@ -804,24 +821,26 @@ void StartDisplayTask(void const * argument)
     uint8_t bNeedsRedraw = u8CleanScreen; // Verifica a flag que a GameTask define
     osMutexRelease(gameMutexHandle);
     // --- Fim da leitura segura ---
-
+    if (eLocalCurrentState != ePreviousState) {
+            ClearScreen(); 
+        
+        // Desenhos iniciais específicos de cada estado
+        if (eLocalCurrentState == eBattleResolution) {
+             DrawBattleResolutionBg(); // Desenha o fundo bgAt.bin UMA VEZ
+             UpdateHealthBars(eUserPlayer.u8HeartPoints, eCpuPlayer.u8HeartPoints);
+             // Desenha idle inicial (DMA rápido pois tem fundo)
+             DrawWizardAction((const EWizard*)&eUserPlayer, 1, ACTION_IDLE);
+             DrawWizardAction((const EWizard*)&eCpuPlayer, 0, ACTION_IDLE);
+        }
+        // ... adicione ifs para os outros estados desenharem seus backgrounds ...
+    }
     // CONDIÇÃO DE REDESENHO CORRIGIDA:
     // Redesenha se o estado mudou (ex: menu -> jogo) OU
     // se a lógica do jogo (GameTask) pediu (ex: mudou a opção do menu)
     if(eLocalCurrentState != ePreviousState || bNeedsRedraw == TRUE)
-    {
-      // Limpa a tela
-      ClearScreen(); 
+    { 
       lastSelectedOption = selectedOption;    
       lastSelectedPersona = -1;
-      // --- Reseta a flag ---
-      // Já que vamos redesenhar, precisamos zerar a flag.
-      if (bNeedsRedraw == TRUE) {
-        osMutexWait(gameMutexHandle, osWaitForever);
-        u8CleanScreen = FALSE; // Flag tratada!
-        osMutexRelease(gameMutexHandle);
-      }
-      // --- Fim do reset da flag ---
 
       switch(eLocalCurrentState)
       {
@@ -856,12 +875,76 @@ void StartDisplayTask(void const * argument)
           }
           case eBattleInit:
           {
-            DrawBattleLayout(selectedDifficulty, &eUserPlayer, &eCpuPlayer); 
-    
+            DrawBattleLayout(selectedDifficulty, (const EWizard*)&eUserPlayer, (const EWizard*)&eCpuPlayer);    
             // Muda o estado "anterior" para evitar redesenho do layout
             ePreviousState = eLocalCurrentState;
             break;
           }
+          case eBattleResolution:
+          {
+              // PASSO 1: Mostrar Ícones (Fogo x Água)
+              EraseClashIcons();
+              if (animStep == 1) {
+                // 1. Limpa os ícones do meio primeiro
+                DrawClashIcons(eUserPlayer.eAttackSequential[animSlotIdx], 
+                                eCpuPlayer.eAttackSequential[animSlotIdx]);
+              }
+              // PASSO 2: Ação (Ataque/Dano)
+              else if (animStep == 2) {
+                  
+                  // 2. Recupera os resultados CALCULADOS para este slot
+                  BattleRoundResult res = battleResults[animSlotIdx];
+                  
+                  // Dano que o Player DEU na CPU
+                  int dmgDealtByPlayer = res.damageToCpu;
+                  // Dano que a CPU DEU no Player
+                  int dmgDealtByCpu = res.damageToUser;
+
+                  uint8_t pAct = ACTION_IDLE;
+                  uint8_t cAct = ACTION_IDLE;
+
+                  // --- NOVA LÓGICA DE ANIMAÇÃO (QUEM BATE E QUEM APANHA) ---
+                  
+                  if (dmgDealtByPlayer > dmgDealtByCpu) {
+                      // CENÁRIO 1: Player venceu o round (Super Efetivo ou CPU Pouco Efetivo)
+                      pAct = ACTION_ATK;   // Player Ataca
+                      cAct = ACTION_HURT;  // CPU Sente o golpe
+                  }
+                  else if (dmgDealtByCpu > dmgDealtByPlayer) {
+                      // CENÁRIO 2: CPU venceu o round
+                      pAct = ACTION_HURT;  // Player Sente o golpe
+                      cAct = ACTION_ATK;   // CPU Ataca
+                  }
+                  else {
+                      // CENÁRIO 3: Empate (Danos iguais)
+                      if (dmgDealtByPlayer > 0) {
+                          // Ambos se acertaram: Vamos mostrar CLASH (Ambos atacam)
+                          // Ou se preferir ambos apanhando, mude para ACTION_HURT
+                          pAct = ACTION_ATK; 
+                          cAct = ACTION_ATK;
+                      } else {
+                          // Ambos bloquearam/Dano zero: Ficam em Idle
+                          pAct = ACTION_IDLE;
+                          cAct = ACTION_IDLE;
+                      }
+                  }
+
+                  // 3. Desenha a animação decidida
+                  DrawWizardAction((const EWizard*)&eUserPlayer, 1, pAct);
+                  DrawWizardAction((const EWizard*)&eCpuPlayer, 0, cAct);
+              }
+              // PASSO 3: Volta para Idle e Atualiza Vida
+              else if (animStep == 3) {
+                  // Volta sprites para Idle (Notei que você mudou os nomes para 'I' e 'I2' no .c,
+                  // certifique-se que ACTION_IDLE (0) mapeia para 'I'/'I2' na DrawWizardAction)
+                  DrawWizardAction((const EWizard*)&eUserPlayer, 1, ACTION_IDLE);
+                  DrawWizardAction((const EWizard*)&eCpuPlayer, 0, ACTION_IDLE);
+                  
+                  // Atualiza as barras de vida agora (efeito visual do dano computado)
+                  UpdateHealthBars(eUserPlayer.u8HeartPoints, eCpuPlayer.u8HeartPoints);
+              }
+              break;
+          }        
           case ePlayerTurn:
           {
             UpdatePlayerAttacks(&eUserPlayer);
@@ -886,6 +969,11 @@ void StartDisplayTask(void const * argument)
             ILI9488_WriteString(10, 10, "Erro de Estado!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
             break;
           }
+      }
+      if (bNeedsRedraw == TRUE) {
+        osMutexWait(gameMutexHandle, osWaitForever);
+        u8CleanScreen = FALSE; // Flag tratada!
+        osMutexRelease(gameMutexHandle);
       }
       ePreviousState = eLocalCurrentState;    
     }

@@ -10,6 +10,7 @@
         "stdio.h": "c",
         "stdbool.h": "c",
         "logo300.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "game_fsm.h": "c"
     }
 }

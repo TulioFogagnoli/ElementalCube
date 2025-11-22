@@ -1,8 +1,7 @@
 Core/Src/game_screen.o: ../Core/Src/game_screen.c \
  ../Core/Inc/game_screen.h ../Core/Inc/game_types.h \
- ../Core/Inc/game_fsm.h ../Core/Inc/game_fsm.h ../Core/Inc/ILI9488.h \
- ../Core/Inc/fonts.h ../Core/Inc/main.h \
- ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
+ ../Core/Inc/game_fsm.h ../Core/Inc/ILI9488.h ../Core/Inc/fonts.h \
+ ../Core/Inc/main.h ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h \
@@ -61,7 +60,6 @@ Core/Src/game_screen.o: ../Core/Src/game_screen.c \
  ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/sd_diskio.h
 ../Core/Inc/game_screen.h:
 ../Core/Inc/game_types.h:
-../Core/Inc/game_fsm.h:
 ../Core/Inc/game_fsm.h:
 ../Core/Inc/ILI9488.h:
 ../Core/Inc/fonts.h:

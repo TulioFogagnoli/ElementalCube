@@ -1,5 +1,7 @@
 #include "game_fsm.h"
 
+BattleRoundResult battleResults[ATTACKS_NUMBERS];
+
 /*
 Atacante	|Defensor	|Resultado para o Atacante
 Fogo	    |Terra	    |Super Efetivo
@@ -29,60 +31,27 @@ void vInitBattle(EWizard* pUserPlayer, EWizard* pCpuPlayer)
 {
   for (uint8_t u8Idx = 0; u8Idx < ATTACKS_NUMBERS; u8Idx++)
   {
-    // Pega os ataques deste turno
+    // 1. Identifica ataques
     EColor userAttack = pUserPlayer->eAttackSequential[u8Idx];
     EColor cpuAttack = pCpuPlayer->eAttackSequential[u8Idx];
 
-    // Calcula o resultado do ataque do Jogador -> CPU
+    // 2. Calcula Dano Player -> CPU
     EAttackOutcome userOutcome = eGetAttackOutcome(userAttack, cpuAttack);
-    uint8_t userDamage = BASE_ATTACK_DAMAGE;
+    int userDamage = BASE_ATTACK_DAMAGE;
+    if (userOutcome == eOutcome_SuperEffective) userDamage *= SUPER_EFFECTIVE_MODIFIER;
+    else if (userOutcome == eOutcome_NotEffective) userDamage *= NOT_EFFECTIVE_MODIFIER;
 
-    if (userOutcome == eOutcome_SuperEffective)
-    {
-      userDamage *= SUPER_EFFECTIVE_MODIFIER;
-    }
-    else if (userOutcome == eOutcome_NotEffective)
-    {
-      userDamage *= NOT_EFFECTIVE_MODIFIER;
-    }
-
-    // Calcula o resultado do ataque da CPU -> Jogador
+    // 3. Calcula Dano CPU -> Player
     EAttackOutcome cpuOutcome = eGetAttackOutcome(cpuAttack, userAttack);
-    uint8_t cpuDamage = BASE_ATTACK_DAMAGE;
+    int cpuDamage = BASE_ATTACK_DAMAGE;
+    if (cpuOutcome == eOutcome_SuperEffective) cpuDamage *= SUPER_EFFECTIVE_MODIFIER;
+    else if (cpuOutcome == eOutcome_NotEffective) cpuDamage *= NOT_EFFECTIVE_MODIFIER;
 
-    if (cpuOutcome == eOutcome_SuperEffective)
-    {
-      cpuDamage *= SUPER_EFFECTIVE_MODIFIER;
-    }
-    else if (cpuOutcome == eOutcome_NotEffective)
-    {
-      cpuDamage *= NOT_EFFECTIVE_MODIFIER;
-    }
-
-    // Aplica o dano, garantindo que a vida não fique negativa
-    if (pCpuPlayer->u8HeartPoints >= userDamage)
-    {
-      pCpuPlayer->u8HeartPoints -= userDamage;
-    }
-    else
-    {
-      pCpuPlayer->u8HeartPoints = 0;
-    }
-
-    if (pUserPlayer->u8HeartPoints >= cpuDamage)
-    {
-      pUserPlayer->u8HeartPoints -= cpuDamage;
-    }
-    else
-    {
-      pUserPlayer->u8HeartPoints = 0;
-    }
-    
-    // Se a vida de alguém chegar a 0, a batalha pode parar mais cedo
-    if(pUserPlayer->u8HeartPoints == 0 || pCpuPlayer->u8HeartPoints == 0)
-    {
-        break; // Encerra o loop for
-    }
+    // 4. Armazena no buffer (SEM subtrair HP ainda)
+    battleResults[u8Idx].damageToCpu = userDamage;
+    battleResults[u8Idx].damageToUser = cpuDamage;
+    battleResults[u8Idx].userOutcome = userOutcome;
+    battleResults[u8Idx].cpuOutcome = cpuOutcome;
   }
 }
 

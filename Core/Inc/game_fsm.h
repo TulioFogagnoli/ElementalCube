@@ -12,6 +12,7 @@ typedef enum {
     eDificultSelect,
     ePersonaSelect,
     eBattleInit,
+    eBattleResolution,
     ePlayerTurn,
     eEndGame
 } EGameStates;
@@ -22,6 +23,15 @@ typedef enum
   eOutcome_SuperEffective,
   eOutcome_NotEffective
 } EAttackOutcome;
+
+typedef struct {
+    int damageToUser;
+    int damageToCpu;
+    EAttackOutcome userOutcome; // Útil se quiser desenhar "Critical" ou "Block" na tela
+    EAttackOutcome cpuOutcome;
+} BattleRoundResult;
+
+extern BattleRoundResult battleResults[ATTACKS_NUMBERS];
 
 void vInitBattle(EWizard *eUserPlayer, EWizard *eCpuPlayer);
 EAttackOutcome eGetAttackOutcome(EColor eAttackerAttack, EColor eDefenderAttack);

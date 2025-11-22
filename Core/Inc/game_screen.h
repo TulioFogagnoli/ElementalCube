@@ -4,69 +4,109 @@
 #include <stdint.h>
 #include "game_types.h"
 
-#define FRAME_PLAYER_W      85   // Exemplo: um pouco maior que 70
-#define FRAME_PLAYER_H      85
-#define FRAME_CPU_W         35   // Exemplo: um pouco maior que 35
-#define FRAME_CPU_H         35
+// ==============================================================================
+// 1. DEFINIÇÕES DE AÇÕES
+// ==============================================================================
+#define ACTION_IDLE   0
+#define ACTION_ATK    1
+#define ACTION_HURT   2
+#define ACTION_WIN    3
+#define ACTION_LOSE   4
 
-// --- OFFSET (AJUSTE FINO) ---
-// Quanto a moldura deve "voltar" em X e Y em relação ao ícone para ficar centralizada?
-// Exemplo: Se a moldura tem 84 e o ícone 70 -> (84 - 70) / 2 = 7 pixels de borda
-#define FRAME_PLAYER_OFF_X  7
-#define FRAME_PLAYER_OFF_Y  7
+// ==============================================================================
+// 2. DIMENSÕES DOS SPRITES (Baseado no Log do Python)
+// ==============================================================================
 
-#define FRAME_CPU_OFF_X     3  // (42 - 35) / 2 = ~3.5
-#define FRAME_CPU_OFF_Y     3
+// --- PLAYER (Mago Grande) ---
+// Usado no Layout estático (mg..3.bin)
+#define DIM_PLAYER_BATTLE_W     171
+#define DIM_PLAYER_BATTLE_H     231
 
-#define PLAYER_ICON_W       70  
-#define PLAYER_ICON_H       70
-#define CPU_ICON_W          35  
-#define CPU_ICON_H          35
+// Usados na Animação
+#define DIM_PLAYER_IDLE_W       129  // mg..I.bin
+#define DIM_PLAYER_IDLE_H       164
+#define DIM_PLAYER_ATK_W        236  // mg..At.bin
+#define DIM_PLAYER_ATK_H        148
+#define DIM_PLAYER_DMG_W        166  // mg..Dan.bin
+#define DIM_PLAYER_DMG_H        163
+// Novos defines para Vitória/Derrota (mg..Vir.bin / mg..Der.bin)
+#define DIM_PLAYER_RES_W        166
+#define DIM_PLAYER_RES_H        167  // ALTURA MÁXIMA! Importante para limpar tela.
 
-// Menu Centro / Battle Player (mgF2.bin -> 170x230)
-#define WIZ_PLAYER_W        171 
-#define WIZ_PLAYER_H        231
+// --- CPU (Mago Pequeno) ---
+#define DIM_CPU_IDLE_W          78   // mg..I2.bin
+#define DIM_CPU_IDLE_H          106
+#define DIM_CPU_ATK_W           183  // mg..At2.bin
+#define DIM_CPU_ATK_H           106
+#define DIM_CPU_DMG_W           110  // mg..Dan2.bin / Vir2 / Der2 (Todos parecem ter ~110x106)
+#define DIM_CPU_DMG_H           106
 
-// Menu Lateral (mgF1.bin -> 123x167)
-#define WIZ_MENU_SM_W       124
-#define WIZ_MENU_SM_H       168
+// --- ÍCONES ---
+#define DIM_ICON_BIG_SIZE       70
+#define DIM_ICON_SMALL_SIZE     35
+#define DIM_ICON_CACHE_SIZE     (DIM_ICON_BIG_SIZE * DIM_ICON_BIG_SIZE * 3)
 
-// Battle CPU (mgF3.bin -> 78x106)
-#define WIZ_CPU_W           78
-#define WIZ_CPU_H           106
+// --- MOLDURAS ---
+#define DIM_FRAME_PLAYER_W      85
+#define DIM_FRAME_PLAYER_H      85
+#define DIM_FRAME_CPU_W         35
+#define DIM_FRAME_CPU_H         35
+#define DIM_MENU_SM_W           124
+#define DIM_MENU_SM_H           168
 
-#define NUM_ELEMENTS        6 
+// ==============================================================================
+// 3. POSICIONAMENTO
+// ==============================================================================
 
-#define ICON_SIZE_P_BYTES   (PLAYER_ICON_W * PLAYER_ICON_H * 3)
-// --- Estruturas de Dados ---
-#define SLOT_X_START    75  // Espaço para centralizar 4 slots
-#define SLOT_SPACING    86
-#define SLOT_CPU_Y      110  // Ícones pequenos em cima
-#define SLOT_PLAYER_Y   235 // Ícones grandes em bai
+// --- ÂNCORAS (Pé no Chão) ---
+#define POS_ANCHOR_PLAYER_X     5
+#define POS_ANCHOR_PLAYER_Y     310 // Com altura 167, desenha em Y=83. Seguro.
 
-#define Y_POS_BIG       50
-#define X_CENTER        (240 - (WIZ_PLAYER_W / 2)) 
+#define POS_ANCHOR_CPU_X        246
+#define POS_ANCHOR_CPU_Y        193
 
-// Laterais (123x167) 
-// NÃO USE VALORES NEGATIVOS com uint16_t!
-#define Y_POS_SMALL     80
-#define X_LEFT          5    // Colado na esquerda (antes era -30)
-#define X_RIGHT         352  // Colado na direita (480 - 123 - 5)
+#define POS_ANCHOR_CPU_ATK_X    175
+#define POS_ANCHOR_CPU_ATK_Y    190
 
-// --- Tela de Batalha ---
-// Player (170x230)
-#define BTL_PLAYER_X    10    // Colado na esquerda (antes era -20)
-#define BTL_PLAYER_Y    80   
-// CPU (78x106)
-#define BTL_CPU_X       200  // Canto direito
-#define BTL_CPU_Y       60
+// --- HUD: BARRAS DE VIDA ---
+#define POS_BAR_PLAYER_X        330
+#define POS_BAR_PLAYER_Y        285
+#define DIM_BAR_W               131
+#define DIM_BAR_H               19
 
-// Estrutura atualizada com 4 campos
+#define POS_BAR_CPU_X           17
+#define POS_BAR_CPU_Y           16
+
+// --- DUELO ---
+#define POS_CLASH_PLAYER_X      373
+#define POS_CLASH_PLAYER_Y      180
+
+#define POS_CLASH_CPU_X         373
+#define POS_CLASH_CPU_Y         85
+
+// --- OFFSETS E OUTROS ---
+#define OFFSET_FRAME_PLAYER_X   7
+#define OFFSET_FRAME_PLAYER_Y   7
+#define OFFSET_FRAME_CPU_X      3
+#define OFFSET_FRAME_CPU_Y      3
+#define POS_SLOT_PLAYER_Y_BASE  236
+#define POS_SLOT_CPU_Y_BASE     150
+#define POS_MENU_CENTER_X       (240 - (171 / 2)) // Usando 171 direto ou DIM_PLAYER_BATTLE_W
+#define POS_MENU_BIG_Y          50
+#define POS_MENU_SMALL_Y        80
+#define POS_MENU_LEFT_X         5
+#define POS_MENU_RIGHT_X        352
+
+// ==============================================================================
+// 4. ESTRUTURAS E PROTÓTIPOS
+// ==============================================================================
+#define NUM_ELEMENTS 6 
+
 typedef struct {
-    const char* name;         // Nome (Ex: "Fogo")
-    const char* path_menu_sm; // Menu Pequeno (Ex: mgF1.bin)
-    const char* path_menu_bg; // Menu Grande / Player Battle (Ex: mgF2.bin)
-    const char* path_cpu;     // CPU Battle (Ex: mgF3.bin)
+    const char* name;
+    const char* path_menu_sm;
+    const char* path_menu_bg;
+    const char* path_cpu;
 } PersonaOptionData_t;
 
 typedef struct {
@@ -80,17 +120,22 @@ typedef struct {
     uint16_t h_sel;
 } DifficultyOptionData_t;
 
-extern uint8_t PlayerIconCache[NUM_ELEMENTS][ICON_SIZE_P_BYTES];
+extern uint8_t PlayerIconCache[NUM_ELEMENTS][DIM_ICON_CACHE_SIZE];
 
-// --- Protótipos de Funções ---
 void ClearScreen();
 void DrawMenu(const char* title, const char** options, int numOptions, int currentSelection);
 void DrawDifficultyMenu(int currentSelection);
 void DrawSingleDifficultyOption(int index, int isSelected);
 void DrawPersonaCarousel(int selectedIndex);
-
 uint8_t LoadAllIconsToCache(void);
+
 void DrawBattleLayout(EDificult difficulty, const EWizard* user, const EWizard* cpu);
 void UpdatePlayerAttacks(const EWizard* user);
+
+void DrawBattleResolutionBg();
+void UpdateHealthBars(uint8_t currentHpPlayer, uint8_t currentHpCpu);
+void DrawClashIcons(EColor playerColor, EColor cpuColor);
+void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action);
+void EraseClashIcons(void);
 
 #endif // GAME_SCREEN_H

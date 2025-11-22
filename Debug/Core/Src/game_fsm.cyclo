@@ -1,2 +1,2 @@
-../Core/Src/game_fsm.c:28:6:vInitBattle	10
-../Core/Src/game_fsm.c:95:16:eGetAttackOutcome	22
+../Core/Src/game_fsm.c:30:6:vInitBattle	6
+../Core/Src/game_fsm.c:64:16:eGetAttackOutcome	22
