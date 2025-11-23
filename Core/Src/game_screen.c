@@ -38,6 +38,7 @@ const DifficultyOptionData_t DIFFICULTY_DATA[] = {
     {"0:/m2.bin",   "0:/m2.bin", 125, 115, 233, 94, 233, 94},
     {"0:/d2.bin", "0:/d2.bin", 125, 200, 233, 94, 233, 94}
 };
+static EColor last_attacks[ATTACKS_NUMBERS] = {0xFF, 0xFF, 0xFF, 0xFF};
 
 // Ajustei para usar as constantes POS_SLOT_...
 const uint16_t PLAYER_SLOTS_POS[4][2] = {
@@ -67,6 +68,11 @@ void DrawCachedPlayerIcon(uint16_t x, uint16_t y, EColor element) {
         x, y, DIM_ICON_BIG_SIZE, DIM_ICON_BIG_SIZE, PlayerIconCache[element]);
 }
 
+void ResetPlayerAttacksCache(void) {
+    for (int i = 0; i < ATTACKS_NUMBERS; i++) {
+        last_attacks[i] = 0xFF; 
+    }
+}
 // =========================================================
 // III. MENU DIFICULDADE
 // =========================================================
@@ -184,7 +190,6 @@ void DrawBattleLayout(EDificult difficulty, const EWizard* user, const EWizard* 
 }
 
 void UpdatePlayerAttacks(const EWizard* user) {
-    static EColor last_attacks[ATTACKS_NUMBERS] = {0xFF, 0xFF, 0xFF, 0xFF};
 
     for (int i = 0; i < ATTACKS_NUMBERS; i++) {
         EColor current_element = user->eAttackSequential[i];
@@ -257,7 +262,7 @@ void UpdateHealthBars(uint8_t currentHpPlayer, uint8_t currentHpCpu) {
 
 // EM game_screen.c
 
-void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action) {
+void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action, const char* bgPath) {
     char filename[30];
     char elemCode[3];
     char suffixStr[5] = ""; 
@@ -286,7 +291,7 @@ void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action) {
         uint16_t clear_h = DIM_PLAYER_RES_H; 
         uint16_t clear_y = POS_ANCHOR_PLAYER_Y - clear_h;
         
-        ILI9488_RestoreRect(POS_ANCHOR_PLAYER_X, clear_y, DIM_PLAYER_ATK_W, clear_h, "0:/bgAt.bin");
+        ILI9488_RestoreRect(POS_ANCHOR_PLAYER_X, clear_y, DIM_PLAYER_ATK_W, clear_h, bgPath);
 
         // Define Sprite
         if (action == ACTION_ATK) {
@@ -305,10 +310,16 @@ void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action) {
             strcpy(suffixStr, "I"); // Idle
             w = DIM_PLAYER_IDLE_W; h = DIM_PLAYER_IDLE_H;
         }
-        
-        x = POS_ANCHOR_PLAYER_X;
-        y = POS_ANCHOR_PLAYER_Y - h;
-        
+        if((action == ACTION_WIN) || (action == ACTION_LOSE))
+        {
+            x = POS_ANCHOR_PLAYER_VIR_X;
+            y = POS_ANCHOR_PLAYER_VIR_Y - h;
+        }
+        else
+        {
+            x = POS_ANCHOR_PLAYER_X;
+            y = POS_ANCHOR_PLAYER_Y - h;
+        }
         sprintf(filename, "0:/mg%s%s.bin", elemCode, suffixStr);
     } 
     else {
@@ -324,33 +335,101 @@ void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action) {
             if (action == ACTION_HURT) {
                 strcpy(suffixStr, "Dan2"); 
                 w = DIM_CPU_DMG_W; h = DIM_CPU_DMG_H;
+                x = POS_ANCHOR_CPU_X;
+                y = POS_ANCHOR_CPU_Y - h;
             } else if (action == ACTION_WIN) {
                  strcpy(suffixStr, "Vir2");
                  w = DIM_CPU_DMG_W; h = DIM_CPU_DMG_H; 
+                 x = POS_ANCHOR_CPU_VIR_X;
+                 y = POS_ANCHOR_CPU_VIR_Y - h;
             } else if (action == ACTION_LOSE) {
                  strcpy(suffixStr, "Der2");
                  w = DIM_CPU_DMG_W; h = DIM_CPU_DMG_H;
+                 x = POS_ANCHOR_CPU_VIR_X;
+                 y = POS_ANCHOR_CPU_VIR_Y - h;
             } else {
                 strcpy(suffixStr, "I2"); // Idle
                 w = DIM_CPU_IDLE_W; h = DIM_CPU_IDLE_H;
+                x = POS_ANCHOR_CPU_X;
+                y = POS_ANCHOR_CPU_Y - h;
             }
-            x = POS_ANCHOR_CPU_X;
-            y = POS_ANCHOR_CPU_Y - h;
         }
 
         sprintf(filename, "0:/mg%s%s.bin", elemCode, suffixStr);
 
-        // Anti-Ghosting CPU Inteligente
-        uint16_t min_x = (POS_ANCHOR_CPU_X < POS_ANCHOR_CPU_ATK_X) ? POS_ANCHOR_CPU_X : POS_ANCHOR_CPU_ATK_X;
-        uint16_t clean_w = DIM_CPU_ATK_W + abs(POS_ANCHOR_CPU_X - POS_ANCHOR_CPU_ATK_X) + 10;
-        // Altura max CPU é constante (106)
-        uint16_t clean_h = DIM_CPU_IDLE_H; 
+        // 2. CÁLCULO INTELIGENTE DA ÁREA DE LIMPEZA (Bounding Box)
         
-        uint16_t clean_y_base = (POS_ANCHOR_CPU_Y > POS_ANCHOR_CPU_ATK_Y) ? POS_ANCHOR_CPU_Y : POS_ANCHOR_CPU_ATK_Y;
-        uint16_t clean_y = clean_y_base - clean_h;
+        // Encontra o X mais à esquerda (Início da limpeza)
+        uint16_t min_x = (POS_ANCHOR_CPU_X < POS_ANCHOR_CPU_ATK_X) ? POS_ANCHOR_CPU_X : POS_ANCHOR_CPU_ATK_X;
+        
+        // Encontra o Y mais alto (Topo da limpeza) - Baseado na altura máxima possível (Idle ou Atk)
+        uint16_t clean_h = (DIM_CPU_IDLE_H > DIM_CPU_ATK_H) ? DIM_CPU_IDLE_H : DIM_CPU_ATK_H;
+        uint16_t clean_y_base = (POS_ANCHOR_CPU_Y > POS_ANCHOR_CPU_ATK_Y) ? POS_ANCHOR_CPU_Y : POS_ANCHOR_CPU_ATK_Y; // Pega a base mais baixa
+        uint16_t clean_y = clean_y_base - clean_h; // Sobe a altura máxima
 
-        ILI9488_RestoreRect(min_x, clean_y, clean_w, clean_h, "0:/bgAt.bin");
+        // CORREÇÃO: Calcula a largura baseada no limite da direita dos sprites, não na soma cega
+        // Onde termina o sprite Idle?
+        uint16_t max_x_idle = POS_ANCHOR_CPU_X + DIM_CPU_IDLE_W;
+        // Onde termina o sprite Ataque?
+        uint16_t max_x_atk  = POS_ANCHOR_CPU_ATK_X + DIM_CPU_ATK_W;
+        
+        // Qual vai mais longe?
+        uint16_t limit_x = (max_x_idle > max_x_atk) ? max_x_idle : max_x_atk;
+        
+        // Largura exata necessária
+        uint16_t clean_w = limit_x - min_x;
+
+        // Aplica a borracha calculada
+        ILI9488_RestoreRect(min_x, clean_y, clean_w, clean_h, bgPath);
     }
 
     ILI9488_DrawImage_BIN(x, y, w, h, filename);
+}
+
+void DrawEndGameScreen(const EWizard* user, const EWizard* cpu) {
+    // 1. Desenha o fundo estático da tela final
+    ILI9488_DrawImage_BIN(0, 0, 480, 320, "0:/bgFim.bin");
+
+    // 2. Verifica condição de vitória do Jogador
+    // Assumindo que se o Player tem vida > 0 ele ganhou (ou verifique quem tem mais vida)
+    uint8_t playerWins = (user->u8HeartPoints > 0);
+
+    if (playerWins) {
+        // --- CENÁRIO DE VITÓRIA ---
+        // Sprites
+        // Player: Pose de Vitória (Vir)
+        DrawWizardAction(user, 1, ACTION_WIN, "0:/bgFim.bin");
+        // CPU: Pose de Derrota (Der2)
+        DrawWizardAction(cpu, 0, ACTION_LOSE, "0:/bgFim.bin");
+
+        // Mensagens de Vitória
+        // "VITORIA" (Grande)
+        ILI9488_DrawImage_Transparent(POS_MSG_BIG_X, POS_MSG_BIG_Y, 
+                                      DIM_MSG_BIG_W, DIM_MSG_BIG_H, "0:/msV.bin");
+        
+        // "VOCE VENCEU" (Pequeno) - Ajuste conforme o texto real da imagem
+        ILI9488_DrawImage_Transparent(POS_MSG_SMALL_X, POS_MSG_SMALL_Y, 
+                                      DIM_MSG_SMALL_W, DIM_MSG_SMALL_H, "0:/msVir.bin");
+
+
+
+    } else {
+        // --- CENÁRIO DE DERROTA ---
+        // Sprites
+        // Player: Pose de Derrota (Der)
+        DrawWizardAction(user, 1, ACTION_LOSE, "0:/bgFim.bin");
+        // CPU: Pose de Vitória (Vir2)
+        DrawWizardAction(cpu, 0, ACTION_WIN, "0:/bgFim.bin");
+        // Mensagens de Derrota
+        // "DERROTA" (Grande)
+        ILI9488_DrawImage_Transparent(POS_MSG_BIG_X, POS_MSG_BIG_Y, 
+                                      DIM_MSG_BIG_W, DIM_MSG_BIG_H, "0:/msD.bin");
+        
+        // "VOCE PERDEU" (Pequeno)
+        ILI9488_DrawImage_Transparent(POS_MSG_SMALL_X, POS_MSG_SMALL_Y, 
+                                      DIM_MSG_SMALL_W, DIM_MSG_SMALL_H, "0:/msDer.bin");
+
+
+    }
+    
 }

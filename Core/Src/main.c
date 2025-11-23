@@ -603,19 +603,34 @@ void StartGameTask(void const * argument)
                 u8CleanScreen = TRUE;
                 u8ContAttack = 0;
                 selectedOption = 0;
-                
+                ResetPlayerAttacksCache();
                 // Reset dos arrays
                 memset((void*)eUserPlayer.eAttackSequential, 0, sizeof(eUserPlayer.eAttackSequential));
                 memset((void*)eCpuPlayer.eAttackSequential, 0, sizeof(eCpuPlayer.eAttackSequential));
                 
                 // Sorteios da CPU
                 srand(HAL_GetTick()); 
-                eCpuPlayer.ePersonaElemental = (EElemental)(rand() % 6);
+                if (selectedDifficulty == 0) // Facil
+                {
+                    // Apenas Fogo (0) ou Agua (1)
+                    eCpuPlayer.ePersonaElemental = (EElemental)(rand() % 2);
+                }
+                else if (selectedDifficulty == 1) // Medio
+                {
+                    // Fogo, Agua, Terra (2), Ar (3)
+                    eCpuPlayer.ePersonaElemental = (EElemental)(rand() % 4);
+                }
+                else // Dificil
+                {
+                    // Apenas Luz (4) ou Sombra (5)
+                    // (rand() % 2) gera 0 ou 1. Somando 4, temos 4 ou 5.
+                    eCpuPlayer.ePersonaElemental = (EElemental)((rand() % 2) + 4);
+                }
+
+                // Gera os ataques iniciais (Isso mantém igual)
                 for(int i = 0; i < ATTACKS_NUMBERS; i++) {
                       eCpuPlayer.eAttackSequential[i] = (EColor)(rand() % 6);
                 }
-
-                // --- CORREÇÃO AQUI ---
                 
                 // 1. Libera o Mutex antes do delay para não travar a DisplayTask desenhando
                 osMutexRelease(gameMutexHandle); 
@@ -754,7 +769,16 @@ void StartGameTask(void const * argument)
             } else {
                 animSlotIdx++;
                 if (animSlotIdx >= ATTACKS_NUMBERS) {
-                    eCurrentState = eBattleInit; // Fim do round, espera tecla
+                    // FIM DO ROUND! Vamos voltar para eBattleInit.
+                    
+                    // --- NOVO CÓDIGO: SORTEAR NOVOS ATAQUES DA CPU ---
+                    for(int i = 0; i < ATTACKS_NUMBERS; i++) {
+                        eCpuPlayer.eAttackSequential[i] = (EColor)(rand() % 6);
+                    }
+                    // ------------------------------------------------
+                    
+                    eCurrentState = eBattleInit; 
+                    ResetPlayerAttacksCache();
                 } else {
                     animStep = 1; // Próximo slot
                 }
@@ -829,8 +853,8 @@ void StartDisplayTask(void const * argument)
              DrawBattleResolutionBg(); // Desenha o fundo bgAt.bin UMA VEZ
              UpdateHealthBars(eUserPlayer.u8HeartPoints, eCpuPlayer.u8HeartPoints);
              // Desenha idle inicial (DMA rápido pois tem fundo)
-             DrawWizardAction((const EWizard*)&eUserPlayer, 1, ACTION_IDLE);
-             DrawWizardAction((const EWizard*)&eCpuPlayer, 0, ACTION_IDLE);
+             DrawWizardAction((const EWizard*)&eUserPlayer, 1, ACTION_IDLE, "0:/bgAt.bin");
+             DrawWizardAction((const EWizard*)&eCpuPlayer, 0, ACTION_IDLE, "0:/bgAt.bin");
         }
         // ... adicione ifs para os outros estados desenharem seus backgrounds ...
     }
@@ -883,9 +907,9 @@ void StartDisplayTask(void const * argument)
           case eBattleResolution:
           {
               // PASSO 1: Mostrar Ícones (Fogo x Água)
-              EraseClashIcons();
               if (animStep == 1) {
                 // 1. Limpa os ícones do meio primeiro
+                EraseClashIcons();
                 DrawClashIcons(eUserPlayer.eAttackSequential[animSlotIdx], 
                                 eCpuPlayer.eAttackSequential[animSlotIdx]);
               }
@@ -930,15 +954,16 @@ void StartDisplayTask(void const * argument)
                   }
 
                   // 3. Desenha a animação decidida
-                  DrawWizardAction((const EWizard*)&eUserPlayer, 1, pAct);
-                  DrawWizardAction((const EWizard*)&eCpuPlayer, 0, cAct);
+                  DrawWizardAction((const EWizard*)&eUserPlayer, 1, pAct, "0:/bgAt.bin");
+                  DrawWizardAction((const EWizard*)&eCpuPlayer, 0, cAct, "0:/bgAt.bin");
               }
               // PASSO 3: Volta para Idle e Atualiza Vida
               else if (animStep == 3) {
+                  EraseClashIcons();
                   // Volta sprites para Idle (Notei que você mudou os nomes para 'I' e 'I2' no .c,
                   // certifique-se que ACTION_IDLE (0) mapeia para 'I'/'I2' na DrawWizardAction)
-                  DrawWizardAction((const EWizard*)&eUserPlayer, 1, ACTION_IDLE);
-                  DrawWizardAction((const EWizard*)&eCpuPlayer, 0, ACTION_IDLE);
+                  DrawWizardAction((const EWizard*)&eUserPlayer, 1, ACTION_IDLE, "0:/bgAt.bin");
+                  DrawWizardAction((const EWizard*)&eCpuPlayer, 0, ACTION_IDLE, "0:/bgAt.bin");
                   
                   // Atualiza as barras de vida agora (efeito visual do dano computado)
                   UpdateHealthBars(eUserPlayer.u8HeartPoints, eCpuPlayer.u8HeartPoints);
@@ -952,16 +977,7 @@ void StartDisplayTask(void const * argument)
           }
           case eEndGame:
           {
-            if (eUserPlayer.u8HeartPoints > 0) {
-                ILI9488_WriteString(70, 80, "VITORIA!", Font_7x10, ILI9488_GREEN, ILI9488_BLACK);
-            } else {
-                ILI9488_WriteString(70, 80, "DERROTA!", Font_7x10, ILI9488_RED, ILI9488_BLACK);
-            }
-            sprintf(buffer, "Sua Vida Final: %d", eUserPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 140, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            sprintf(buffer, "Vida Final CPU: %d", eCpuPlayer.u8HeartPoints);
-            ILI9488_WriteString(10, 160, buffer, Font_7x10, ILI9488_WHITE, ILI9488_BLACK);
-            ILI9488_WriteString(10, 250, "Pressione * para recomecar", Font_7x10, ILI9488_YELLOW, ILI9488_BLACK);
+            DrawEndGameScreen((const EWizard*)&eUserPlayer, (const EWizard*)&eCpuPlayer);
             break;
           }
           default:

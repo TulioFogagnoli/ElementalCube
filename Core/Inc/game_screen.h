@@ -55,19 +55,29 @@
 #define DIM_MENU_SM_H           168
 
 // ==============================================================================
+// 2.1 DIMENSÕES TELA FINAL (Novo)
+// ==============================================================================
+#define DIM_MSG_BIG_W           225  // msV.bin, msD.bin
+#define DIM_MSG_BIG_H           92
+#define DIM_MSG_SMALL_W         166  // msVir.bin, msDer.bin
+#define DIM_MSG_SMALL_H         67
+
+// ==============================================================================
 // 3. POSICIONAMENTO
 // ==============================================================================
 
 // --- ÂNCORAS (Pé no Chão) ---
 #define POS_ANCHOR_PLAYER_X     5
 #define POS_ANCHOR_PLAYER_Y     310 // Com altura 167, desenha em Y=83. Seguro.
-
+#define POS_ANCHOR_PLAYER_VIR_X 4
+#define POS_ANCHOR_PLAYER_VIR_Y 295 // Com altura 167, desenha em Y=83. Seguro.
 #define POS_ANCHOR_CPU_X        246
 #define POS_ANCHOR_CPU_Y        193
 
 #define POS_ANCHOR_CPU_ATK_X    175
 #define POS_ANCHOR_CPU_ATK_Y    190
-
+#define POS_ANCHOR_CPU_VIR_X    185
+#define POS_ANCHOR_CPU_VIR_Y    200
 // --- HUD: BARRAS DE VIDA ---
 #define POS_BAR_PLAYER_X        330
 #define POS_BAR_PLAYER_Y        285
@@ -90,12 +100,18 @@
 #define OFFSET_FRAME_CPU_X      3
 #define OFFSET_FRAME_CPU_Y      3
 #define POS_SLOT_PLAYER_Y_BASE  236
-#define POS_SLOT_CPU_Y_BASE     150
+#define POS_SLOT_CPU_Y_BASE     155
 #define POS_MENU_CENTER_X       (240 - (171 / 2)) // Usando 171 direto ou DIM_PLAYER_BATTLE_W
 #define POS_MENU_BIG_Y          50
 #define POS_MENU_SMALL_Y        80
 #define POS_MENU_LEFT_X         5
 #define POS_MENU_RIGHT_X        352
+
+#define POS_MSG_BIG_X           170  // (480 - 225) / 2
+#define POS_MSG_BIG_Y           210   // Topo da tela
+
+#define POS_MSG_SMALL_X         20  // (480 - 166) / 2
+#define POS_MSG_SMALL_Y         20  // Logo abaixo da mensagem grande
 
 // ==============================================================================
 // 4. ESTRUTURAS E PROTÓTIPOS
@@ -131,11 +147,13 @@ uint8_t LoadAllIconsToCache(void);
 
 void DrawBattleLayout(EDificult difficulty, const EWizard* user, const EWizard* cpu);
 void UpdatePlayerAttacks(const EWizard* user);
+void ResetPlayerAttacksCache(void);
 
 void DrawBattleResolutionBg();
 void UpdateHealthBars(uint8_t currentHpPlayer, uint8_t currentHpCpu);
 void DrawClashIcons(EColor playerColor, EColor cpuColor);
-void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action);
+void DrawWizardAction(const EWizard* wiz, uint8_t isPlayer, uint8_t action, const char* bgPath);
 void EraseClashIcons(void);
+void DrawEndGameScreen(const EWizard* user, const EWizard* cpu);
 
 #endif // GAME_SCREEN_H

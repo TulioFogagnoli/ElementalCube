@@ -7,8 +7,8 @@
 ../Core/Src/main.c:440:13:MX_DMA_Init	1
 ../Core/Src/main.c:463:13:MX_GPIO_Init	1
 ../Core/Src/main.c:521:6:StartInputHalTask	3
-../Core/Src/main.c:540:6:StartGameTask	38
-../Core/Src/main.c:771:6:StartDisplayTask	34
-../Core/Src/main.c:1034:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:1048:6:HAL_SPI_TxCpltCallback	3
-../Core/Src/main.c:1061:6:Error_Handler	1
+../Core/Src/main.c:540:6:StartGameTask	41
+../Core/Src/main.c:795:6:StartDisplayTask	33
+../Core/Src/main.c:1050:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:1064:6:HAL_SPI_TxCpltCallback	3
+../Core/Src/main.c:1077:6:Error_Handler	1
