@@ -72,11 +72,11 @@ void Error_Handler(void);
 #define LCD_LED_Pin GPIO_PIN_7
 #define LCD_LED_GPIO_Port GPIOC
 #define BTN_CONFIRM_PORT  GPIOD
-#define BTN_CONFIRM_PIN   GPIO_PIN_4
+#define BTN_CONFIRM_PIN   GPIO_PIN_1
 #define BTN_BACK_PORT     GPIOD
-#define BTN_BACK_PIN      GPIO_PIN_5
+#define BTN_BACK_PIN      GPIO_PIN_3
 #define BTN_UP_PORT       GPIOD
-#define BTN_UP_PIN        GPIO_PIN_6
+#define BTN_UP_PIN        GPIO_PIN_5
 #define BTN_DOWN_PORT     GPIOD
 #define BTN_DOWN_PIN      GPIO_PIN_7
 

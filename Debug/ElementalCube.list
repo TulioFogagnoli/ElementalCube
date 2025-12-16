@@ -5545,7 +5545,7 @@ char KEYPAD_Scan(void) {
     // ----- Lógica do Botão CIMA (Verde - PD6) -----
     // Usamos BTN_UP_PORT e BTN_UP_PIN direto de main.h
     uint8_t current_up = HAL_GPIO_ReadPin(BTN_UP_PORT, BTN_UP_PIN);
- 8002d66:	2140      	movs	r1, #64	@ 0x40
+ 8002d66:	2120      	movs	r1, #32
  8002d68:	4839      	ldr	r0, [pc, #228]	@ (8002e50 <KEYPAD_Scan+0xf0>)
  8002d6a:	f002 ff17 	bl	8005b9c <HAL_GPIO_ReadPin>
  8002d6e:	4603      	mov	r3, r0
@@ -5621,7 +5621,7 @@ char KEYPAD_Scan(void) {
     // ----- Lógica do Botão CONFIRMAR (Vermelho - PD4) -----
     // Usamos BTN_CONFIRM_PORT e BTN_CONFIRM_PIN direto de main.h
     uint8_t current_confirm = HAL_GPIO_ReadPin(BTN_CONFIRM_PORT, BTN_CONFIRM_PIN);
- 8002dd6:	2110      	movs	r1, #16
+ 8002dd6:	2102      	movs	r1, #2
  8002dd8:	481d      	ldr	r0, [pc, #116]	@ (8002e50 <KEYPAD_Scan+0xf0>)
  8002dda:	f002 fedf 	bl	8005b9c <HAL_GPIO_ReadPin>
  8002dde:	4603      	mov	r3, r0
@@ -5659,7 +5659,7 @@ char KEYPAD_Scan(void) {
     // ----- Lógica do Botão VOLTAR (Preto - PD5) -----
     // Usamos BTN_BACK_PORT e BTN_BACK_PIN direto de main.h
     uint8_t current_back = HAL_GPIO_ReadPin(BTN_BACK_PORT, BTN_BACK_PIN);
- 8002e0e:	2120      	movs	r1, #32
+ 8002e0e:	2108      	movs	r1, #8
  8002e10:	480f      	ldr	r0, [pc, #60]	@ (8002e50 <KEYPAD_Scan+0xf0>)
  8002e12:	f002 fec3 	bl	8005b9c <HAL_GPIO_ReadPin>
  8002e16:	4603      	mov	r3, r0
@@ -6718,7 +6718,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : R1_Pin R2_Pin R3_Pin R4_Pin */
   GPIO_InitStruct.Pin = BTN_CONFIRM_PIN |BTN_BACK_PIN|BTN_UP_PIN|BTN_DOWN_PIN;
- 80034b8:	23f0      	movs	r3, #240	@ 0xf0
+ 80034b8:	23aa      	movs	r3, #170	@ 0xaa
  80034ba:	617b      	str	r3, [r7, #20]
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
  80034bc:	2300      	movs	r3, #0
